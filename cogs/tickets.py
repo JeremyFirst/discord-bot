@@ -2,6 +2,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from config import TICKET_CATEGORY_ID, TICKET_ADMIN_ROLE_ID
+
+
+# ===== КОНФИГ ТИПОВ ТИКЕТОВ =====
+
 TICKET_TYPES = {
     "appeal": {
         "label": "Апелляция",
@@ -25,6 +30,8 @@ TICKET_TYPES = {
     }
 }
 
+
+# ===== SELECT =====
 
 class TicketTypeSelect(discord.ui.Select):
     def __init__(self):
@@ -63,23 +70,19 @@ class TicketCreateView(discord.ui.View):
         self.add_item(TicketTypeSelect())
 
 
-# ===== МОДАЛЬНЫЕ ОКНА =====
+# ===== MODALS =====
 
 class PlayerReportModal(discord.ui.Modal, title="Жалоба на игрока"):
-    steam_id = discord.ui.TextInput(
+    steam = discord.ui.TextInput(
         label="SteamID или ник нарушителя",
-        placeholder="SteamID64 или ник",
         required=True,
         max_length=64
     )
-
     time = discord.ui.TextInput(
         label="Время происшествия",
-        placeholder="Пример: 20.01.2026 ~ 18:30",
         required=True,
         max_length=64
     )
-
     description = discord.ui.TextInput(
         label="Описание нарушения",
         style=discord.TextStyle.paragraph,
@@ -92,7 +95,7 @@ class PlayerReportModal(discord.ui.Modal, title="Жалоба на игрока"
             interaction,
             "player_report",
             {
-                "SteamID / Ник": self.steam_id.value,
+                "SteamID / Ник": self.steam.value,
                 "Время": self.time.value,
                 "Описание": self.description.value
             }
@@ -121,7 +124,6 @@ class AdminReportModal(discord.ui.Modal, title="Жалоба на админис
         required=True,
         max_length=64
     )
-
     description = discord.ui.TextInput(
         label="Описание ситуации",
         style=discord.TextStyle.paragraph,
@@ -156,7 +158,7 @@ class TechModal(discord.ui.Modal, title="Техническая помощь"):
         )
 
 
-# ===== ОСНОВНАЯ ЛОГИКА СОЗДАНИЯ ТИКЕТА =====
+# ===== СОЗДАНИЕ ТИКЕТА =====
 
 async def create_ticket(
     interaction: discord.Interaction,
@@ -166,21 +168,32 @@ async def create_ticket(
     guild = interaction.guild
     user = interaction.user
 
-    # 🔧 ЗАМЕНИ ID НА СВОИ
-    CATEGORY_ID = 123456789012345678  
+    category = guild.get_channel(TICKET_CATEGORY_ID)
+    admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
 
-    category = guild.get_channel(CATEGORY_ID)
+    if not category:
+        await interaction.response.send_message(
+            "❌ Категория для тикетов не найдена. Сообщите администрации.",
+            ephemeral=True
+        )
+        return
 
-    # ❗ Пока без MySQL — заглушка
+    # ⚠️ ВРЕМЕННАЯ НУМЕРАЦИЯ (позже заменим на MySQL)
     ticket_number = 1
     letter = TICKET_TYPES[ticket_type]["letter"]
-
     channel_name = f"ticket-{ticket_number:04d}{letter}"
 
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
         user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
     }
+
+    if admin_role:
+        overwrites[admin_role] = discord.PermissionOverwrite(
+            view_channel=True,
+            send_messages=True,
+            manage_channels=True
+        )
 
     channel = await guild.create_text_channel(
         name=channel_name,
@@ -189,7 +202,7 @@ async def create_ticket(
     )
 
     embed = discord.Embed(
-        title=f"Тикет #{ticket_number:04d}{letter}",
+        title=f"🎫 Тикет #{ticket_number:04d}{letter}",
         color=discord.Color.blurple()
     )
 
@@ -212,7 +225,10 @@ class Tickets(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="ticket-panel", description="Создать панель тикетов")
+    @app_commands.command(
+        name="ticket-panel",
+        description="Создать панель тикетов"
+    )
     @app_commands.checks.has_permissions(administrator=True)
     async def ticket_panel(self, interaction: discord.Interaction):
         embed = discord.Embed(
@@ -220,7 +236,7 @@ class Tickets(commands.Cog):
             description=(
                 "Выберите причину обращения в меню ниже.\n\n"
                 "⚠️ Пожалуйста, выбирайте категорию корректно — "
-                "это ускорит обработку вашего тикета."
+                "это ускорит обработку."
             ),
             color=discord.Color.blurple()
         )
@@ -231,7 +247,7 @@ class Tickets(commands.Cog):
         )
 
         await interaction.response.send_message(
-            "Панель тикетов создана.",
+            "✅ Панель тикетов создана.",
             ephemeral=True
         )
 
