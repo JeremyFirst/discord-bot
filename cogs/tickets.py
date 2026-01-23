@@ -18,7 +18,7 @@ TICKET_TYPES = {
     },
     "admin_report": {
         "label": "Жалоба на администратора",
-        "letter": "M",
+        "letter": "A",
         "description": "Нарушение правил со стороны администрации"
     },
     "tech": {
@@ -136,6 +136,45 @@ class TechModal(discord.ui.Modal, title="Техническая помощь"):
             "Проблема": self.issue.value
         })
 
+class TicketCloseButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="Close",
+            style=discord.ButtonStyle.danger,
+            custom_id="ticket_close"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_message(
+            "Close pressed (logic will be added next step).",
+            ephemeral=True
+        )
+
+
+class TicketClaimButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="Claim",
+            style=discord.ButtonStyle.success,
+            custom_id="ticket_claim"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_message(
+            "Claim pressed (logic will be added next step).",
+            ephemeral=True
+        )
+
+
+class TicketUserView(discord.ui.View):
+    def __init__(self, *, is_admin: bool):
+        super().__init__(timeout=None)
+
+        self.add_item(TicketCloseButton())
+
+        if is_admin:
+            self.add_item(TicketClaimButton())
+
 
 # ===== CREATE TICKET =====
 
@@ -176,7 +215,13 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
     for k, v in fields.items():
         embed.add_field(name=k, value=v, inline=False)
 
-    await channel.send(embed=embed)
+    admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
+    is_admin = admin_role in user.roles if admin_role else False
+
+    await channel.send(
+        embed=embed,
+        view=TicketUserView(is_admin=is_admin)
+    )
     await interaction.response.send_message(f"✅ Тикет создан: {channel.mention}", ephemeral=True)
 
 
