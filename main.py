@@ -19,10 +19,12 @@ async def main():
 
     @bot.event
     async def on_ready():
-        print(f"🤖 Logged in as {bot.user}")
+        print(f"🤖 Бот запущен как {bot.user}")
 
     async def setup_hook():
         await Database.connect()
+        print("✅ MySQL connected")
+
 
         await bot.load_extension("cogs.tickets")
 
@@ -30,6 +32,8 @@ async def main():
         bot.add_view(TicketCreateView())
 
         await bot.tree.sync()
+        print("✅ Slash-команды синхронизированы")
+
 
     bot.setup_hook = setup_hook
 
