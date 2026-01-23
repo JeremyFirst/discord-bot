@@ -17,6 +17,11 @@ class Bot(commands.Bot):
         )
 
     async def setup_hook(self):
+
+        from core.database import Database
+        await Database.connect()
+        print("✅ MySQL connected")
+
         # Загружаем cogs
         await self.load_extension("cogs.tickets")
 
