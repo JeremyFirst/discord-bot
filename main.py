@@ -20,6 +20,9 @@ class Bot(commands.Bot):
         # Загружаем cogs
         await self.load_extension("cogs.tickets")
 
+        from cogs.tickets import TicketCreateView
+        self.add_view(TicketCreateView())
+
         # Синхронизация slash-команд
         await self.tree.sync()
         print("✅ Slash-команды синхронизированы")

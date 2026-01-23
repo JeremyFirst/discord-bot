@@ -5,23 +5,21 @@ from discord.ext import commands
 from config import TICKET_CATEGORY_ID, TICKET_ADMIN_ROLE_ID
 
 
-# ===== КОНФИГ ТИПОВ ТИКЕТОВ =====
-
 TICKET_TYPES = {
-    "appeal": {
-        "label": "Апелляция",
-        "letter": "A",
-        "description": "Обжалование наказания"
+    "unban_request": {
+        "label": "Заявление о разбане",
+        "letter": "U",
+        "description": "Если ваш игровой аккаунт был заблокирован"
     },
     "player_report": {
         "label": "Жалоба на игрока",
         "letter": "P",
-        "description": "Сообщить о нарушении игрока"
+        "description": "Нарушение правил со стороны игрока"
     },
     "admin_report": {
         "label": "Жалоба на администратора",
         "letter": "M",
-        "description": "Сообщить о нарушении администратора"
+        "description": "Нарушение правил со стороны администрации"
     },
     "tech": {
         "label": "Техническая помощь",
@@ -35,32 +33,28 @@ TICKET_TYPES = {
 
 class TicketTypeSelect(discord.ui.Select):
     def __init__(self):
-        options = [
-            discord.SelectOption(
-                label=data["label"],
-                value=key,
-                description=data["description"]
-            )
-            for key, data in TICKET_TYPES.items()
-        ]
-
         super().__init__(
-            placeholder="Выберите причину тикета",
-            options=options,
-            min_values=1,
-            max_values=1
+            placeholder="Выберите причину создания тикета",
+            options=[
+                discord.SelectOption(
+                    label=data["label"],
+                    value=key,
+                    description=data["description"]
+                )
+                for key, data in TICKET_TYPES.items()
+            ]
         )
 
     async def callback(self, interaction: discord.Interaction):
-        ticket_type = self.values[0]
+        t = self.values[0]
 
-        if ticket_type == "player_report":
+        if t == "unban_request":
+            await interaction.response.send_modal(UnbanModal())
+        elif t == "player_report":
             await interaction.response.send_modal(PlayerReportModal())
-        elif ticket_type == "appeal":
-            await interaction.response.send_modal(AppealModal())
-        elif ticket_type == "admin_report":
+        elif t == "admin_report":
             await interaction.response.send_modal(AdminReportModal())
-        elif ticket_type == "tech":
+        elif t == "tech":
             await interaction.response.send_modal(TechModal())
 
 
@@ -72,120 +66,91 @@ class TicketCreateView(discord.ui.View):
 
 # ===== MODALS =====
 
-class PlayerReportModal(discord.ui.Modal, title="Жалоба на игрока"):
-    steam = discord.ui.TextInput(
-        label="SteamID или ник нарушителя",
-        required=True,
-        max_length=64
-    )
-    time = discord.ui.TextInput(
-        label="Время происшествия",
-        required=True,
-        max_length=64
-    )
-    description = discord.ui.TextInput(
-        label="Описание нарушения",
-        style=discord.TextStyle.paragraph,
-        required=True,
-        max_length=1000
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        await create_ticket(
-            interaction,
-            "player_report",
-            {
-                "SteamID / Ник": self.steam.value,
-                "Время": self.time.value,
-                "Описание": self.description.value
-            }
-        )
-
-
-class AppealModal(discord.ui.Modal, title="Апелляция"):
-    reason = discord.ui.TextInput(
-        label="Причина апелляции",
-        style=discord.TextStyle.paragraph,
-        required=True,
-        max_length=1000
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        await create_ticket(
-            interaction,
-            "appeal",
-            {"Причина": self.reason.value}
-        )
-
-
-class AdminReportModal(discord.ui.Modal, title="Жалоба на администратора"):
-    admin = discord.ui.TextInput(
-        label="Ник администратора",
-        required=True,
-        max_length=64
-    )
+class UnbanModal(discord.ui.Modal, title="Заявление о разбане"):
+    steam = discord.ui.TextInput(label="Ваш SteamID", required=True)
+    ban_time = discord.ui.TextInput(label="Время и дата выдачи наказания", required=True)
     description = discord.ui.TextInput(
         label="Описание ситуации",
         style=discord.TextStyle.paragraph,
-        required=True,
-        max_length=1000
+        required=True
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        await create_ticket(
-            interaction,
-            "admin_report",
-            {
-                "Администратор": self.admin.value,
-                "Описание": self.description.value
-            }
-        )
+        await create_ticket(interaction, "unban_request", {
+            "SteamID": self.steam.value,
+            "Дата наказания": self.ban_time.value,
+            "Описание": self.description.value
+        })
+
+
+class PlayerReportModal(discord.ui.Modal, title="Жалоба на игрока"):
+    violator = discord.ui.TextInput(label="SteamID / Ник нарушителя", required=True)
+    time = discord.ui.TextInput(label="Время и дата нарушения", required=True)
+    proofs = discord.ui.TextInput(label="Доказательства", required=False)
+    description = discord.ui.TextInput(
+        label="Описание ситуации",
+        style=discord.TextStyle.paragraph,
+        required=True
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await create_ticket(interaction, "player_report", {
+            "Нарушитель": self.violator.value,
+            "Время": self.time.value,
+            "Доказательства": self.proofs.value or "Не предоставлены",
+            "Описание": self.description.value
+        })
+
+
+class AdminReportModal(discord.ui.Modal, title="Жалоба на администратора"):
+    user_steam = discord.ui.TextInput(label="Ваш SteamID", required=True)
+    admin = discord.ui.TextInput(label="SteamID / Ник администратора", required=True)
+    time = discord.ui.TextInput(label="Время и дата нарушения", required=True)
+    proofs = discord.ui.TextInput(label="Доказательства нарушения", required=False)
+    description = discord.ui.TextInput(
+        label="Описание ситуации",
+        style=discord.TextStyle.paragraph,
+        required=True
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await create_ticket(interaction, "admin_report", {
+            "Ваш SteamID": self.user_steam.value,
+            "Администратор": self.admin.value,
+            "Время": self.time.value,
+            "Доказательства": self.proofs.value or "Не предоставлены",
+            "Описание": self.description.value
+        })
 
 
 class TechModal(discord.ui.Modal, title="Техническая помощь"):
     issue = discord.ui.TextInput(
         label="Опишите проблему",
         style=discord.TextStyle.paragraph,
-        required=True,
-        max_length=1000
+        required=True
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        await create_ticket(
-            interaction,
-            "tech",
-            {"Проблема": self.issue.value}
-        )
+        await create_ticket(interaction, "tech", {
+            "Проблема": self.issue.value
+        })
 
 
-# ===== СОЗДАНИЕ ТИКЕТА =====
+# ===== CREATE TICKET =====
 
-async def create_ticket(
-    interaction: discord.Interaction,
-    ticket_type: str,
-    fields: dict
-):
+async def create_ticket(interaction: discord.Interaction, ticket_type: str, fields: dict):
     guild = interaction.guild
     user = interaction.user
 
     category = guild.get_channel(TICKET_CATEGORY_ID)
     admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
 
-    if not category:
-        await interaction.response.send_message(
-            "❌ Категория для тикетов не найдена. Сообщите администрации.",
-            ephemeral=True
-        )
-        return
-
-    # ⚠️ ВРЕМЕННАЯ НУМЕРАЦИЯ (позже заменим на MySQL)
-    ticket_number = 1
+    ticket_number = 1  # позже заменим на MySQL
     letter = TICKET_TYPES[ticket_type]["letter"]
-    channel_name = f"ticket-{ticket_number:04d}{letter}"
 
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+        user: discord.PermissionOverwrite(view_channel=True)
     }
 
     if admin_role:
@@ -196,7 +161,7 @@ async def create_ticket(
         )
 
     channel = await guild.create_text_channel(
-        name=channel_name,
+        name=f"ticket-{ticket_number:04d}{letter}",
         category=category,
         overwrites=overwrites
     )
@@ -205,52 +170,40 @@ async def create_ticket(
         title=f"🎫 Тикет #{ticket_number:04d}{letter}",
         color=discord.Color.blurple()
     )
-
     embed.add_field(name="Автор", value=user.mention, inline=False)
 
-    for name, value in fields.items():
-        embed.add_field(name=name, value=value, inline=False)
+    for k, v in fields.items():
+        embed.add_field(name=k, value=v, inline=False)
 
     await channel.send(embed=embed)
-
-    await interaction.response.send_message(
-        f"✅ Тикет создан: {channel.mention}",
-        ephemeral=True
-    )
+    await interaction.response.send_message(f"✅ Тикет создан: {channel.mention}", ephemeral=True)
 
 
 # ===== COG =====
 
 class Tickets(commands.Cog):
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(
-        name="ticket-panel",
-        description="Создать панель тикетов"
-    )
+    @app_commands.command(name="ticket-panel", description="Создать панель тикетов")
     @app_commands.checks.has_permissions(administrator=True)
     async def ticket_panel(self, interaction: discord.Interaction):
         embed = discord.Embed(
-            title="🎫 Тикет-система",
+            title="🎫 Создание тикета",
             description=(
-                "Выберите причину обращения в меню ниже.\n\n"
-                "⚠️ Пожалуйста, выбирайте категорию корректно — "
-                "это ускорит обработку."
+                "**Выберите подходящую категорию:**\n\n"
+                "🔹 **Заявление о разбане** — если ваш аккаунт был заблокирован.\n"
+                "🔹 **Жалоба на игрока** — если игрок нарушил правила.\n"
+                "🔹 **Жалоба на администратора** — если администратор нарушил правила.\n"
+                "🔹 **Техническая помощь** — проблемы с сервером или игрой.\n\n"
+                "⚠️ Пожалуйста, указывайте точную информацию и прикладывайте доказательства."
             ),
             color=discord.Color.blurple()
         )
 
-        await interaction.channel.send(
-            embed=embed,
-            view=TicketCreateView()
-        )
-
-        await interaction.response.send_message(
-            "✅ Панель тикетов создана.",
-            ephemeral=True
-        )
+        await interaction.channel.send(embed=embed, view=TicketCreateView())
+        await interaction.response.send_message("✅ Панель тикетов создана.", ephemeral=True)
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot):
     await bot.add_cog(Tickets(bot))
