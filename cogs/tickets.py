@@ -42,7 +42,8 @@ class TicketTypeSelect(discord.ui.Select):
                     description=data["description"]
                 )
                 for key, data in TICKET_TYPES.items()
-            ]
+            ],
+            custom_id="ticket_type_select"  # 🔥 ОБЯЗАТЕЛЬНО
         )
 
     async def callback(self, interaction: discord.Interaction):
