@@ -53,3 +53,10 @@ class Database:
         async with cls.pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(query, args)
+
+    @classmethod
+    async def close(cls):
+        if cls.pool:
+            cls.pool.close()
+            await cls.pool.wait_closed()
+            print("🛑 MySQL pool closed")
