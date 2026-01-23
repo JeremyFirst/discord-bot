@@ -1,6 +1,8 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+from core.database import Database
+
 
 from config import TICKET_CATEGORY_ID, TICKET_ADMIN_ROLE_ID
 
@@ -185,7 +187,10 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
     category = guild.get_channel(TICKET_CATEGORY_ID)
     admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
 
-    ticket_number = 1  # позже заменим на MySQL
+    row = await Database.fetchrow(
+    "SELECT MAX(ticket_number) AS max_number FROM tickets")
+
+    ticket_number = (row["max_number"] or 0) + 1
     letter = TICKET_TYPES[ticket_type]["letter"]
 
     overwrites = {
