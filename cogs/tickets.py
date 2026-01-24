@@ -188,7 +188,9 @@ async def generate_transcript(channel: discord.TextChannel):
         users.add(message.author)
 
         timestamp = message.created_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        author = f"{message.author} ({message.author.id})"
+        author_name = str(message.author)
+        author_id = message.author.id
+        avatar_url = message.author.display_avatar.url
 
         content = (
             message.content
@@ -199,11 +201,15 @@ async def generate_transcript(channel: discord.TextChannel):
 
         messages_html.append(f"""
         <div class="message">
-            <div class="meta">
-                <span class="author">{author}</span>
-                <span class="time">{timestamp}</span>
+            <img class="avatar" src="{avatar_url}">
+            <div class="body">
+                <div class="meta">
+                    <span class="author">{author_name}</span>
+                    <span class="userid">({author_id})</span>
+                    <span class="time">{timestamp}</span>
+                </div>
+                <div class="content">{content}</div>
             </div>
-            <div class="content">{content}</div>
         </div>
         """)
 
@@ -259,17 +265,41 @@ async def generate_transcript(channel: discord.TextChannel):
             font-size: 12px;
         }}
 
-        .messages {{
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }}
-
         .message {{
+            display: flex;
+            gap: 12px;
             background: #020617;
-            padding: 14px 16px;
+            padding: 14px;
             border-radius: 10px;
         }}
+
+        .avatar {{
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            object-fit: cover;
+        }}
+
+        .body {{
+            flex: 1;
+        }}
+
+        .author {{
+            font-weight: 600;
+            color: #38bdf8;
+        }}
+
+        .userid {{
+            color: #64748b;
+            font-size: 11px;
+            margin-left: 4px;
+        }}
+
+        .time {{
+            color: #94a3b8;
+            font-size: 11px;
+            margin-left: 8px;
+       }}
 
         .meta {{
             font-size: 12px;
