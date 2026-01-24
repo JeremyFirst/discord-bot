@@ -248,6 +248,15 @@ class TicketClaimButton(discord.ui.Button):
             ephemeral=True
         )
 
+# ================== PERSISTENT VIEW ==================
+
+class PersistentTicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+        self.add_item(TicketCloseButton())
+        self.add_item(TicketClaimButton())
+
 
 # ================== VIEWS ==================
 
@@ -388,8 +397,8 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
     is_admin = admin_role in user.roles if admin_role else False
 
     await channel.send(
-        embed=embed,
-        view=TicketUserView(is_admin=is_admin)
+    embed=embed,
+    view=PersistentTicketView()
     )
 
     await interaction.response.send_message(

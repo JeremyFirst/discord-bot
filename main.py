@@ -28,8 +28,9 @@ async def main():
 
         await bot.load_extension("cogs.tickets")
 
-        from cogs.tickets import TicketCreateView
+        from cogs.tickets import TicketCreateView, PersistentTicketView
         bot.add_view(TicketCreateView())
+        bot.add_view(PersistentTicketView())
 
         await bot.tree.sync()
         print("✅ Slash-команды синхронизированы")
