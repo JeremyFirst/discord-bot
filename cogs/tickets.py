@@ -1,11 +1,12 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+
+from config import TICKET_CATEGORY_ID, TICKET_ADMIN_ROLE_ID
 from core.database import Database
 
 
-from config import TICKET_CATEGORY_ID, TICKET_ADMIN_ROLE_ID
-
+# ================== TICKET TYPES ==================
 
 TICKET_TYPES = {
     "unban_request": {
@@ -31,7 +32,7 @@ TICKET_TYPES = {
 }
 
 
-# ===== SELECT =====
+# ================== SELECT ==================
 
 class TicketTypeSelect(discord.ui.Select):
     def __init__(self):
@@ -45,7 +46,7 @@ class TicketTypeSelect(discord.ui.Select):
                 )
                 for key, data in TICKET_TYPES.items()
             ],
-            custom_id="ticket_type_select"  # 🔥 ОБЯЗАТЕЛЬНО
+            custom_id="ticket_type_select"
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -67,7 +68,7 @@ class TicketCreateView(discord.ui.View):
         self.add_item(TicketTypeSelect())
 
 
-# ===== MODALS =====
+# ================== MODALS ==================
 
 class UnbanModal(discord.ui.Modal, title="Заявление о разбане"):
     steam = discord.ui.TextInput(label="Ваш SteamID", required=True)
@@ -138,6 +139,18 @@ class TechModal(discord.ui.Modal, title="Техническая помощь"):
             "Проблема": self.issue.value
         })
 
+
+# ================== HELPERS ==================
+
+async def get_ticket(channel_id: int):
+    return await Database.fetchrow(
+        "SELECT * FROM tickets WHERE channel_id = %s",
+        (channel_id,)
+    )
+
+
+# ================== BUTTONS ==================
+
 class TicketCloseButton(discord.ui.Button):
     def __init__(self):
         super().__init__(
@@ -147,10 +160,49 @@ class TicketCloseButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.send_message(
-            "Close pressed (logic will be added next step).",
-            ephemeral=True
-        )
+        ticket = await get_ticket(interaction.channel.id)
+        if not ticket:
+            await interaction.response.send_message(
+                "❌ Ticket not found.",
+                ephemeral=True
+            )
+            return
+
+        guild = interaction.guild
+        admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
+
+        is_admin = admin_role in interaction.user.roles if admin_role else False
+        is_owner = interaction.user.id == ticket["user_id"]
+
+        # 👤 PLAYER
+        if is_owner and not is_admin:
+            await interaction.response.send_message(
+                "Вы уверены, что хотите закрыть тикет?\n"
+                "Are you sure you want to close this ticket?",
+                view=CloseConfirmView(),
+                ephemeral=True
+            )
+            return
+
+        # 🛡 ADMIN
+        if is_admin:
+            await Database.execute(
+                "UPDATE tickets SET status = 'closed' WHERE channel_id = %s",
+                (interaction.channel.id,)
+            )
+
+            embed = discord.Embed(
+                title="🔒 Ticket Closed",
+                description=f"Closed by {interaction.user.mention}",
+                color=discord.Color.red()
+            )
+
+            await interaction.channel.send(
+                embed=embed,
+                view=TicketAdminClosedView()
+            )
+
+            await interaction.response.defer()
 
 
 class TicketClaimButton(discord.ui.Button):
@@ -162,11 +214,35 @@ class TicketClaimButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
+
+        if not admin_role or admin_role not in interaction.user.roles:
+            await interaction.response.send_message(
+                "❌ You are not allowed to claim this ticket.",
+                ephemeral=True
+            )
+            return
+
+        embed = interaction.message.embeds[0]
+        embed.add_field(
+            name="Assigned to",
+            value=interaction.user.mention,
+            inline=False
+        )
+
+        await interaction.message.edit(
+            embed=embed,
+            view=TicketUserView(is_admin=False)
+        )
+
         await interaction.response.send_message(
-            "Claim pressed (logic will be added next step).",
+            "✅ Ticket claimed.",
             ephemeral=True
         )
 
+
+# ================== VIEWS ==================
 
 class TicketUserView(discord.ui.View):
     def __init__(self, *, is_admin: bool):
@@ -178,7 +254,47 @@ class TicketUserView(discord.ui.View):
             self.add_item(TicketClaimButton())
 
 
-# ===== CREATE TICKET =====
+class CloseConfirmView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=60)
+
+    @discord.ui.button(
+        label="Confirm Close",
+        style=discord.ButtonStyle.danger,
+        custom_id="ticket_confirm_close"
+    )
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await Database.execute(
+            "UPDATE tickets SET status = 'closed' WHERE channel_id = %s",
+            (interaction.channel.id,)
+        )
+        await interaction.channel.delete(reason="Ticket closed by owner")
+
+
+class TicketAdminClosedView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+        self.add_item(discord.ui.Button(
+            label="Transcript",
+            style=discord.ButtonStyle.secondary,
+            custom_id="ticket_transcript"
+        ))
+
+        self.add_item(discord.ui.Button(
+            label="Open",
+            style=discord.ButtonStyle.primary,
+            custom_id="ticket_open"
+        ))
+
+        self.add_item(discord.ui.Button(
+            label="Delete",
+            style=discord.ButtonStyle.danger,
+            custom_id="ticket_delete"
+        ))
+
+
+# ================== CREATE TICKET ==================
 
 async def create_ticket(interaction: discord.Interaction, ticket_type: str, fields: dict):
     guild = interaction.guild
@@ -188,9 +304,10 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
     admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
 
     row = await Database.fetchrow(
-    "SELECT MAX(ticket_number) AS max_number FROM tickets")
-
+        "SELECT MAX(ticket_number) AS max_number FROM tickets"
+    )
     ticket_number = (row["max_number"] or 0) + 1
+
     letter = TICKET_TYPES[ticket_type]["letter"]
 
     overwrites = {
@@ -211,6 +328,20 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
         overwrites=overwrites
     )
 
+    await Database.execute(
+        """
+        INSERT INTO tickets (ticket_number, ticket_type, ticket_letter, user_id, channel_id)
+        VALUES (%s, %s, %s, %s, %s)
+        """,
+        (
+            ticket_number,
+            ticket_type,
+            letter,
+            user.id,
+            channel.id
+        )
+    )
+
     embed = discord.Embed(
         title=f"🎫 Тикет #{ticket_number:04d}{letter}",
         color=discord.Color.blurple()
@@ -220,17 +351,20 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
     for k, v in fields.items():
         embed.add_field(name=k, value=v, inline=False)
 
-    admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
     is_admin = admin_role in user.roles if admin_role else False
 
     await channel.send(
         embed=embed,
         view=TicketUserView(is_admin=is_admin)
     )
-    await interaction.response.send_message(f"✅ Тикет создан: {channel.mention}", ephemeral=True)
+
+    await interaction.response.send_message(
+        f"✅ Тикет создан: {channel.mention}",
+        ephemeral=True
+    )
 
 
-# ===== COG =====
+# ================== COG ==================
 
 class Tickets(commands.Cog):
     def __init__(self, bot):
@@ -252,8 +386,15 @@ class Tickets(commands.Cog):
             color=discord.Color.blurple()
         )
 
-        await interaction.channel.send(embed=embed, view=TicketCreateView())
-        await interaction.response.send_message("✅ Панель тикетов создана.", ephemeral=True)
+        await interaction.channel.send(
+            embed=embed,
+            view=TicketCreateView()
+        )
+
+        await interaction.response.send_message(
+            "✅ Панель тикетов создана.",
+            ephemeral=True
+        )
 
 
 async def setup(bot):
