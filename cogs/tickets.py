@@ -413,7 +413,6 @@ async def generate_transcript(channel: discord.TextChannel):
 
 
 # ================== BUTTONS ==================
-
 class TicketCloseButton(discord.ui.Button):
     def __init__(self):
         super().__init__(
@@ -422,60 +421,62 @@ class TicketCloseButton(discord.ui.Button):
             custom_id="ticket_close"
         )
 
-async def callback(self, interaction: discord.Interaction):
-    ticket = await get_ticket(interaction.channel.id)
-    if not ticket:
-        await interaction.response.send_message(
-            "❌ Ticket not found.",
-            ephemeral=True
-        )
-        return
+    async def callback(self, interaction: discord.Interaction):
+        ticket = await get_ticket(interaction.channel.id)
+        if not ticket:
+            await interaction.response.send_message(
+                "❌ Ticket not found.",
+                ephemeral=True
+            )
+            return
 
-    guild = interaction.guild
-    admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
+        guild = interaction.guild
+        admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
 
-    is_admin = admin_role in interaction.user.roles if admin_role else False
-    is_owner = interaction.user.id == ticket["user_id"]
+        is_admin = admin_role in interaction.user.roles if admin_role else False
+        is_owner = interaction.user.id == ticket["user_id"]
 
-    # 👤 Пользователь — СПРАШИВАЕМ ПОДТВЕРЖДЕНИЕ
-    if is_owner and not is_admin:
-        await interaction.response.send_message(
-            "❗ Вы уверены, что хотите закрыть тикет?",
-            view=CloseConfirmView(),
-            ephemeral=True
-        )
-        return
+        # 👤 USER
+        if is_owner and not is_admin:
+            await interaction.response.send_message(
+                "❗ Вы уверены, что хотите закрыть тикет?\n"
+                "Are you sure you want to close this ticket?",
+                view=CloseConfirmView(),
+                ephemeral=True
+            )
+            return
 
-    # 🛡 Администратор — ЗАКРЫВАЕМ СРАЗУ
-    if is_admin:
-        await interaction.response.defer()
+        # 🛡 ADMIN
+        if is_admin:
+            await interaction.response.defer()
 
-        await Database.execute(
-            "UPDATE tickets SET status = 'closed' WHERE channel_id = %s",
-            (interaction.channel.id,)
-        )
+            await Database.execute(
+                "UPDATE tickets SET status = 'closed' WHERE channel_id = %s",
+                (interaction.channel.id,)
+            )
 
-        await send_ticket_log(
-            guild=guild,
-            title="🔒 Ticket Closed (Admin)",
-            description=(
-                f"🎫 **{interaction.channel.name}**\n"
-                f"🛡 Закрыт администратором: {interaction.user.mention}"
-            ),
-            color=discord.Color.red()
-        )
+            await send_ticket_log(
+                guild=guild,
+                title="🔒 Ticket Closed (Admin)",
+                description=(
+                    f"🎫 **{interaction.channel.name}**\n"
+                    f"🛡 Закрыт администратором: {interaction.user.mention}"
+                ),
+                color=discord.Color.red()
+            )
 
-        embed = discord.Embed(
-            title="🔒 Ticket Closed",
-            description="Тикет закрыт администратором.",
-            color=discord.Color.red()
-        )
+            embed = discord.Embed(
+                title="🔒 Ticket Closed",
+                description="Тикет закрыт администратором.",
+                color=discord.Color.red()
+            )
 
-        await interaction.channel.send(
-            embed=embed,
-            view=TicketAdminClosedView()
-        )
-        return
+            await interaction.channel.send(
+                embed=embed,
+                view=TicketAdminClosedView()
+            )
+            return
+
 
 class TicketClaimButton(discord.ui.Button):
     def __init__(self):
@@ -552,42 +553,44 @@ class TicketUserView(discord.ui.View):
         if is_admin:
             self.add_item(TicketClaimButton())
 
-
 class CloseConfirmView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=60)
 
-@discord.ui.button(
-    label="Confirm Close",
-    style=discord.ButtonStyle.danger,
-    custom_id="ticket_confirm_close"
-)
-async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-    await interaction.response.defer(ephemeral=True)
-
-    ticket = await get_ticket(interaction.channel.id)
-    if not ticket:
-        return
-
-    await Database.execute(
-        "UPDATE tickets SET status = 'closed' WHERE channel_id = %s",
-        (interaction.channel.id,)
+    @discord.ui.button(
+        label="Confirm Close",
+        style=discord.ButtonStyle.danger,
+        custom_id="ticket_confirm_close"
     )
+    async def confirm(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.defer(ephemeral=True)
 
-    await send_ticket_log(
-        guild=interaction.guild,
-        title="🔒 Ticket Closed (User)",
-        description=(
-            f"🎫 **{interaction.channel.name}**\n"
-            f"👤 Закрыт пользователем: {interaction.user.mention}"
-        ),
-        color=discord.Color.red()
-    )
+        ticket = await get_ticket(interaction.channel.id)
+        if not ticket:
+            return
 
-    await interaction.channel.delete(
-        reason="Ticket closed by owner"
-    )
+        await Database.execute(
+            "UPDATE tickets SET status = 'closed' WHERE channel_id = %s",
+            (interaction.channel.id,)
+        )
 
+        await send_ticket_log(
+            guild=interaction.guild,
+            title="🔒 Ticket Closed (User)",
+            description=(
+                f"🎫 **{interaction.channel.name}**\n"
+                f"👤 Закрыт пользователем: {interaction.user.mention}"
+            ),
+            color=discord.Color.red()
+        )
+
+        await interaction.channel.delete(
+            reason="Ticket closed by owner"
+        )
 
 class TicketAdminClosedView(discord.ui.View):
     def __init__(self):
