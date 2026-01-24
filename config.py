@@ -24,3 +24,7 @@ MYSQL_PORT = int(os.getenv("MYSQL_PORT", 3306))
 MYSQL_USER = os.getenv("MYSQL_USER")
 MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD")
 MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
+
+TICKET_LOG_CHANNEL_ID = int(
+    os.getenv("TICKET_LOG_CHANNEL_ID", "0")
+)

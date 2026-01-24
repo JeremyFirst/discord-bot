@@ -148,6 +148,30 @@ async def get_ticket(channel_id: int):
         (channel_id,)
     )
 
+async def send_ticket_log(
+    guild: discord.Guild,
+    title: str,
+    description: str,
+    color: discord.Color
+):
+    from config import TICKET_LOG_CHANNEL_ID
+
+    if not TICKET_LOG_CHANNEL_ID:
+        return
+
+    log_channel = guild.get_channel(TICKET_LOG_CHANNEL_ID)
+    if not log_channel:
+        return
+
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=color
+    )
+
+    await log_channel.send(embed=embed)
+
+
 
 # ================== BUTTONS ==================
 
@@ -186,6 +210,17 @@ class TicketCloseButton(discord.ui.Button):
 
         # 🛡 ADMIN
         if is_admin:
+            await send_ticket_log(
+            guild=interaction.guild,
+            title="🔒 Ticket Closed",
+            description=(
+                f"🎫 **{interaction.channel.name}**\n"
+                f"🛡 Закрыт администратором: {interaction.user.mention}\n"
+                f"📍 Канал: {interaction.channel.mention}"
+                ),
+                color=discord.Color.red()
+            )
+
             await Database.execute(
                 "UPDATE tickets SET status = 'closed' WHERE channel_id = %s",
                 (interaction.channel.id,)
@@ -235,13 +270,24 @@ class TicketClaimButton(discord.ui.Button):
                     value=interaction.user.mention,
                     inline=False
                 )
-            break
+                break
 
 
         await interaction.message.edit(
             embed=embed,
             view=TicketUserView(is_admin=False)
         )
+
+        await send_ticket_log(
+                guild=interaction.guild,
+                title="🟢 Ticket Claimed",
+                description=(
+                    f"🎫 **{interaction.channel.name}**\n"
+                    f"👮 В работе у: {interaction.user.mention}\n"
+                    f"📍 Канал: {interaction.channel.mention}"
+                ),
+                color=discord.Color.blue()
+            )
 
         await interaction.response.send_message(
             "✅ Ticket claimed.",
@@ -279,13 +325,27 @@ class CloseConfirmView(discord.ui.View):
         style=discord.ButtonStyle.danger,
         custom_id="ticket_confirm_close"
     )
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def confirm(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await send_ticket_log(
+            guild=interaction.guild,
+            title="🔒 Ticket Closed",
+            description=(
+                f"🎫 **{interaction.channel.name}**\n"
+                f"👤 Закрыт пользователем: {interaction.user.mention}"
+            ),
+            color=discord.Color.red()
+        )
+
         await Database.execute(
             "UPDATE tickets SET status = 'closed' WHERE channel_id = %s",
             (interaction.channel.id,)
         )
-        await interaction.channel.delete(reason="Ticket closed by owner")
 
+        await interaction.channel.delete(reason="Ticket closed by owner")
 
 class TicketAdminClosedView(discord.ui.View):
     def __init__(self):
@@ -405,6 +465,18 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
         f"✅ Тикет создан: {channel.mention}",
         ephemeral=True
     )
+
+    await send_ticket_log(
+    guild=guild,
+    title="🆕 Ticket Created",
+    description=(
+        f"🎫 **{channel.name}**\n"
+        f"👤 Автор: {user.mention}\n"
+        f"📂 Тип: {TICKET_TYPES[ticket_type]['label']}\n"
+        f"📍 Канал: {channel.mention}"
+    ),
+    color=discord.Color.green()
+)
 
 
 # ================== COG ==================
