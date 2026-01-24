@@ -192,12 +192,51 @@ async def generate_transcript(channel: discord.TextChannel):
         author_id = message.author.id
         avatar_url = message.author.display_avatar.url
 
-        content = (
-            message.content
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-        )
+        content_parts = []
+
+        # обычный текст
+        if message.content:
+            safe_content = (
+                message.content
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+            )
+            content_parts.append(f"<div>{safe_content}</div>")
+
+        # embeds (ОЧЕНЬ ВАЖНО)
+        for embed in message.embeds:
+            embed_block = ""
+
+            if embed.title:
+                embed_block += f"<div class='embed-title'>{embed.title}</div>"
+
+            if embed.description:
+                desc = (
+                    embed.description
+                    .replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                )
+                embed_block += f"<div class='embed-desc'>{desc}</div>"
+
+            for field in embed.fields:
+                embed_block += (
+                    f"<div class='embed-field'>"
+                    f"<b>{field.name}</b><br>{field.value}"
+                    f"</div>"
+                )
+
+            if embed_block:
+                content_parts.append(
+                    f"<div class='embed'>{embed_block}</div>"
+                )
+
+        # если вообще ничего нет
+        if not content_parts:
+            content_parts.append("<i>(empty message)</i>")
+
+        content = "".join(content_parts)
 
         messages_html.append(f"""
         <div class="message">
@@ -315,6 +354,29 @@ async def generate_transcript(channel: discord.TextChannel):
         .content {{
             white-space: pre-wrap;
             line-height: 1.4;
+        }}
+        
+        .embed {{
+            background: #020617;
+            border-left: 4px solid #5865f2;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 6px;
+        }}
+
+        .embed-title {{
+            font-weight: 600;
+            margin-bottom: 4px;
+        }}
+
+        .embed-desc {{
+            font-size: 14px;
+            margin-bottom: 6px;
+        }}
+
+        .embed-field {{
+            font-size: 13px;
+            margin-top: 4px;
         }}
     </style>
 </head>
