@@ -171,6 +171,84 @@ async def send_ticket_log(
 
     await log_channel.send(embed=embed)
 
+import os
+from datetime import timezone
+
+
+async def generate_transcript(channel: discord.TextChannel):
+    os.makedirs("transcripts", exist_ok=True)
+
+    filename = f"{channel.name}.html"
+    filepath = f"transcripts/{filename}"
+
+    messages_html = []
+    users = set()
+
+    async for message in channel.history(limit=None, oldest_first=True):
+        users.add(message.author)
+
+        timestamp = message.created_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        author = f"{message.author} ({message.author.id})"
+
+        content = (
+            message.content
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+
+        messages_html.append(f"""
+        <div class="message">
+            <div class="meta">
+                <span class="author">{author}</span>
+                <span class="time">{timestamp}</span>
+            </div>
+            <div class="content">{content}</div>
+        </div>
+        """)
+
+    html = f"""
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Transcript {channel.name}</title>
+        <style>
+            body {{
+                background-color: #2b2d31;
+                color: #dcddde;
+                font-family: Arial, sans-serif;
+                padding: 20px;
+            }}
+            .message {{
+                margin-bottom: 12px;
+                padding: 10px;
+                background: #1e1f22;
+                border-radius: 6px;
+            }}
+            .meta {{
+                font-size: 12px;
+                color: #b5bac1;
+                margin-bottom: 6px;
+            }}
+            .author {{
+                font-weight: bold;
+            }}
+            .content {{
+                white-space: pre-wrap;
+            }}
+        </style>
+    </head>
+    <body>
+        <h2>Transcript for #{channel.name}</h2>
+        {''.join(messages_html)}
+    </body>
+    </html>
+    """
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    return filename, users
 
 
 # ================== BUTTONS ==================
@@ -351,24 +429,81 @@ class TicketAdminClosedView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-        self.add_item(discord.ui.Button(
-            label="Transcript",
-            style=discord.ButtonStyle.secondary,
-            custom_id="ticket_transcript"
-        ))
+    @discord.ui.button(
+        label="Transcript",
+        style=discord.ButtonStyle.secondary,
+        custom_id="ticket_transcript"
+    )
+    async def transcript_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        from config import TRANSCRIPT_PUBLIC_URL
+        import os
 
-        self.add_item(discord.ui.Button(
-            label="Open",
-            style=discord.ButtonStyle.primary,
-            custom_id="ticket_open"
-        ))
+        await interaction.response.defer(ephemeral=True)
 
-        self.add_item(discord.ui.Button(
-            label="Delete",
-            style=discord.ButtonStyle.danger,
-            custom_id="ticket_delete"
-        ))
+        filename, users = await generate_transcript(interaction.channel)
+        url = f"{TRANSCRIPT_PUBLIC_URL}/transcripts/{filename}"
 
+        user_list = "\n".join(
+            f"{i+1}. {user.mention}" for i, user in enumerate(users)
+        )
+
+        ticket = await get_ticket(interaction.channel.id)
+
+        embed = discord.Embed(
+            title="📄 Ticket Transcript",
+            color=discord.Color.blurple()
+        )
+
+        embed.add_field(
+            name="Ticket Owner",
+            value=f"<@{ticket['user_id']}>",
+            inline=True
+        )
+
+        embed.add_field(
+            name="Ticket Name",
+            value=interaction.channel.name,
+            inline=True
+        )
+
+        embed.add_field(
+            name="Panel Name",
+            value=TICKET_TYPES[ticket["ticket_type"]]["label"],
+            inline=False
+        )
+
+        embed.add_field(
+            name="Users in transcript",
+            value=user_list or "—",
+            inline=False
+        )
+
+        view = discord.ui.View()
+        view.add_item(
+            discord.ui.Button(
+                label="Direct Link",
+                style=discord.ButtonStyle.link,
+                url=url
+            )
+        )
+
+        log_channel = interaction.guild.get_channel(
+            int(os.getenv("TICKET_LOG_CHANNEL_ID"))
+        )
+
+        if log_channel:
+            await log_channel.send(embed=embed, view=view)
+
+        await send_ticket_log(
+            guild=interaction.guild,
+            title="📄 Transcript Generated",
+            description=f"🎫 **{interaction.channel.name}**",
+            color=discord.Color.blurple()
+        )
 
 # ================== CREATE TICKET ==================
 
