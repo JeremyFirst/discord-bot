@@ -225,11 +225,18 @@ class TicketClaimButton(discord.ui.Button):
             return
 
         embed = interaction.message.embeds[0]
-        embed.add_field(
-            name="Assigned to",
-            value=interaction.user.mention,
-            inline=False
-        )
+
+        # Обновляем поле "В работе у"
+        for index, field in enumerate(embed.fields):
+            if field.name == "👮 В работе у":
+                embed.set_field_at(
+                    index,
+                    name="👮 В работе у",
+                    value=interaction.user.mention,
+                    inline=False
+                )
+            break
+
 
         await interaction.message.edit(
             embed=embed,
@@ -343,13 +350,40 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
     )
 
     embed = discord.Embed(
-        title=f"🎫 Тикет #{ticket_number:04d}{letter}",
-        color=discord.Color.blurple()
-    )
-    embed.add_field(name="Автор", value=user.mention, inline=False)
+    title=f"🎫 Тикет #{ticket_number:04d}{letter}",
+    description="Информация по обращению:",
+    color=discord.Color.blurple()
+)
 
+    # Аватар пользователя
+    embed.set_thumbnail(url=user.display_avatar.url)
+
+    # Автор
+    embed.add_field(
+        name="👤 Автор тикета",
+        value=user.mention,
+        inline=False
+    )
+
+    # Кто занимается тикетом (пока пусто)
+    embed.add_field(
+        name="👮 В работе у",
+        value="—",
+        inline=False
+    )
+
+    # Данные из формы
     for k, v in fields.items():
-        embed.add_field(name=k, value=v, inline=False)
+        embed.add_field(
+            name=k,
+            value=v,
+            inline=False
+        )
+
+    embed.set_footer(
+        text="Пожалуйста, ожидайте ответа администрации"
+    )
+
 
     is_admin = admin_role in user.roles if admin_role else False
 
