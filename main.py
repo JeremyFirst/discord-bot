@@ -4,6 +4,8 @@ from discord.ext import commands
 
 from config import DISCORD_TOKEN
 from core.database import Database
+from core.transcript_server import start_transcript_server
+from config import TRANSCRIPT_HOST, TRANSCRIPT_PORT
 
 
 INTENTS = discord.Intents.default()
@@ -12,6 +14,11 @@ INTENTS.members = True
 
 
 async def main():
+    await start_transcript_server(
+        host=TRANSCRIPT_HOST,
+        port=TRANSCRIPT_PORT
+    )
+
     bot = commands.Bot(
         command_prefix="!",
         intents=INTENTS

@@ -71,10 +71,10 @@ class TicketCreateView(discord.ui.View):
 # ================== MODALS ==================
 
 class UnbanModal(discord.ui.Modal, title="Заявление о разбане"):
-    steam = discord.ui.TextInput(label="Ваш SteamID", required=True)
-    ban_time = discord.ui.TextInput(label="Время и дата выдачи наказания", required=True)
+    steam = discord.ui.TextInput(label="Ваш SteamID:", required=True)
+    ban_time = discord.ui.TextInput(label="Время и дата выдачи наказания:", required=True)
     description = discord.ui.TextInput(
-        label="Описание ситуации",
+        label="Описание ситуации:",
         style=discord.TextStyle.paragraph,
         required=True
     )
@@ -88,11 +88,11 @@ class UnbanModal(discord.ui.Modal, title="Заявление о разбане")
 
 
 class PlayerReportModal(discord.ui.Modal, title="Жалоба на игрока"):
-    violator = discord.ui.TextInput(label="SteamID / Ник нарушителя", required=True)
-    time = discord.ui.TextInput(label="Время и дата нарушения", required=True)
-    proofs = discord.ui.TextInput(label="Доказательства", required=False)
+    violator = discord.ui.TextInput(label="SteamID / Ник нарушителя:", required=True)
+    time = discord.ui.TextInput(label="Время и дата нарушения:", required=True)
+    proofs = discord.ui.TextInput(label="Доказательства:", required=False)
     description = discord.ui.TextInput(
-        label="Описание ситуации",
+        label="Описание ситуации:",
         style=discord.TextStyle.paragraph,
         required=True
     )
@@ -107,12 +107,12 @@ class PlayerReportModal(discord.ui.Modal, title="Жалоба на игрока"
 
 
 class AdminReportModal(discord.ui.Modal, title="Жалоба на администратора"):
-    user_steam = discord.ui.TextInput(label="Ваш SteamID", required=True)
-    admin = discord.ui.TextInput(label="SteamID / Ник администратора", required=True)
-    time = discord.ui.TextInput(label="Время и дата нарушения", required=True)
-    proofs = discord.ui.TextInput(label="Доказательства нарушения", required=False)
+    user_steam = discord.ui.TextInput(label="Ваш SteamID:", required=True)
+    admin = discord.ui.TextInput(label="SteamID/Ник администратора:", required=True)
+    time = discord.ui.TextInput(label="Время и дата нарушения:", required=True)
+    proofs = discord.ui.TextInput(label="Доказательства нарушения:", required=False)
     description = discord.ui.TextInput(
-        label="Описание ситуации",
+        label="Описание ситуации:",
         style=discord.TextStyle.paragraph,
         required=True
     )
