@@ -208,42 +208,111 @@ async def generate_transcript(channel: discord.TextChannel):
         """)
 
     html = f"""
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>Transcript {channel.name}</title>
-        <style>
-            body {{
-                background-color: #2b2d31;
-                color: #dcddde;
-                font-family: Arial, sans-serif;
-                padding: 20px;
-            }}
-            .message {{
-                margin-bottom: 12px;
-                padding: 10px;
-                background: #1e1f22;
-                border-radius: 6px;
-            }}
-            .meta {{
-                font-size: 12px;
-                color: #b5bac1;
-                margin-bottom: 6px;
-            }}
-            .author {{
-                font-weight: bold;
-            }}
-            .content {{
-                white-space: pre-wrap;
-            }}
-        </style>
-    </head>
-    <body>
-        <h2>Transcript for #{channel.name}</h2>
-        {''.join(messages_html)}
-    </body>
-    </html>
-    """
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Transcript {channel.name}</title>
+    <style>
+        body {{
+            background-color: #0f172a;
+            color: #e5e7eb;
+            font-family: Inter, Arial, sans-serif;
+            padding: 30px;
+        }}
+
+        .container {{
+            max-width: 1100px;
+            margin: auto;
+        }}
+
+        .header {{
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background: #020617;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }}
+
+        .header h1 {{
+            margin: 0;
+            font-size: 22px;
+        }}
+
+        .info {{
+            background: #020617;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+        }}
+
+        .info div {{
+            font-size: 14px;
+        }}
+
+        .label {{
+            color: #94a3b8;
+            font-size: 12px;
+        }}
+
+        .messages {{
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }}
+
+        .message {{
+            background: #020617;
+            padding: 14px 16px;
+            border-radius: 10px;
+        }}
+
+        .meta {{
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }}
+
+        .author {{
+            font-weight: 600;
+            color: #38bdf8;
+        }}
+
+        .content {{
+            white-space: pre-wrap;
+            line-height: 1.4;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 Transcript — #{channel.name}</h1>
+        </div>
+
+        <div class="info">
+            <div>
+                <div class="label">Channel</div>
+                <div>#{channel.name}</div>
+            </div>
+            <div>
+                <div class="label">Total messages</div>
+                <div>{len(messages_html)}</div>
+            </div>
+        </div>
+
+        <div class="messages">
+            {''.join(messages_html)}
+        </div>
+    </div>
+</body>
+</html>
+"""
+
 
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(html)
