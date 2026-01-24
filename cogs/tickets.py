@@ -448,6 +448,8 @@ async def callback(self, interaction: discord.Interaction):
 
     # 🛡 Администратор — ЗАКРЫВАЕМ СРАЗУ
     if is_admin:
+        await interaction.response.defer()
+
         await Database.execute(
             "UPDATE tickets SET status = 'closed' WHERE channel_id = %s",
             (interaction.channel.id,)
@@ -473,10 +475,7 @@ async def callback(self, interaction: discord.Interaction):
             embed=embed,
             view=TicketAdminClosedView()
         )
-
-        await interaction.response.defer()
-
-
+        return
 
 class TicketClaimButton(discord.ui.Button):
     def __init__(self):
@@ -564,12 +563,10 @@ class CloseConfirmView(discord.ui.View):
     custom_id="ticket_confirm_close"
 )
 async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+    await interaction.response.defer(ephemeral=True)
+
     ticket = await get_ticket(interaction.channel.id)
     if not ticket:
-        await interaction.response.send_message(
-            "❌ Ticket not found.",
-            ephemeral=True
-        )
         return
 
     await Database.execute(
@@ -585,11 +582,6 @@ async def confirm(self, interaction: discord.Interaction, button: discord.ui.But
             f"👤 Закрыт пользователем: {interaction.user.mention}"
         ),
         color=discord.Color.red()
-    )
-
-    await interaction.response.send_message(
-        "✅ Тикет закрыт.",
-        ephemeral=True
     )
 
     await interaction.channel.delete(
