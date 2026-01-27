@@ -411,6 +411,33 @@ async def generate_transcript(channel: discord.TextChannel):
 
     return filename, users
 
+# ================== DELETE TASK ==================
+
+async def delete_ticket_channel(channel, guild, user):
+    import asyncio
+
+    await channel.send("🗑 **Ticket will be deleted in 5 seconds...**")
+    await asyncio.sleep(5)
+
+    await send_ticket_log(
+        guild=guild,
+        title="🗑 Ticket Deleted",
+        description=(
+            f"🎫 **{channel.name}**\n"
+            f"🛡 Удалён администратором: {user.mention}"
+        ),
+        color=discord.Color.dark_red()
+    )
+
+    await Database.execute(
+        "UPDATE tickets SET status = 'deleted' WHERE channel_id = %s",
+        (channel.id,)
+    )
+
+    await channel.delete(
+        reason=f"Ticket deleted by {user}"
+    )
+
 
 # ================== BUTTONS ==================
 class TicketCloseButton(discord.ui.Button):
@@ -646,8 +673,6 @@ class TicketAdminClosedView(discord.ui.View):
 
     @discord.ui.button(label="Delete", style=discord.ButtonStyle.danger)
     async def delete_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        import asyncio
-
         await interaction.response.defer()
         await self.lock(interaction)
 
@@ -655,32 +680,11 @@ class TicketAdminClosedView(discord.ui.View):
         guild = interaction.guild
         user = interaction.user
 
-        # 🔐 ДАЁМ БОТУ ПРАВА НА КАНАЛ
-        await channel.set_permissions(
-            guild.me,
-            manage_channels=True,
-            view_channel=True
+        # 🔥 ВАЖНО: запускаем в фоне
+        interaction.client.loop.create_task(
+            delete_ticket_channel(channel, guild, user)
         )
 
-        await channel.send("🗑 **Ticket will be deleted in 5 seconds...**")
-        await asyncio.sleep(5)
-
-        await send_ticket_log(
-            guild=guild,
-            title="🗑 Ticket Deleted",
-            description=(
-                f"🎫 **{channel.name}**\n"
-                f"🛡 Удалён администратором: {user.mention}"
-            ),
-            color=discord.Color.dark_red()
-        )
-
-        await Database.execute(
-            "UPDATE tickets SET status = 'deleted' WHERE channel_id = %s",
-            (channel.id,)
-        )
-
-        await channel.delete(reason=f"Ticket deleted by {user}")
 
 # ================== CREATE TICKET ==================
 
@@ -826,3 +830,7 @@ class Tickets(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Tickets(bot))
+
+    # 🔥 ОБЯЗАТЕЛЬНО
+    bot.add_view(PersistentTicketView())
+    bot.add_view(TicketAdminClosedView())
