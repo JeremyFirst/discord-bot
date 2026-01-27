@@ -31,7 +31,6 @@ TICKET_TYPES = {
     }
 }
 
-
 # ================== SELECT ==================
 
 class TicketTypeSelect(discord.ui.Select):
@@ -61,12 +60,10 @@ class TicketTypeSelect(discord.ui.Select):
         elif t == "tech":
             await interaction.response.send_modal(TechModal())
 
-
 class TicketCreateView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(TicketTypeSelect())
-
 
 # ================== MODALS ==================
 
@@ -958,5 +955,4 @@ class Tickets(commands.Cog):
 async def setup(bot):
     await bot.add_cog(Tickets(bot))
 
-    # 🔥 ОБЯЗАТЕЛЬНО
     bot.add_view(PersistentTicketView())
