@@ -86,7 +86,6 @@ class UnbanModal(discord.ui.Modal, title="Заявление о разбане")
             "Описание": self.description.value
         })
 
-
 class PlayerReportModal(discord.ui.Modal, title="Жалоба на игрока"):
     violator = discord.ui.TextInput(label="SteamID / Ник нарушителя:", required=True)
     time = discord.ui.TextInput(label="Время и дата нарушения:", required=True)
@@ -104,7 +103,6 @@ class PlayerReportModal(discord.ui.Modal, title="Жалоба на игрока"
             "Доказательства": self.proofs.value or "Не предоставлены",
             "Описание": self.description.value
         })
-
 
 class AdminReportModal(discord.ui.Modal, title="Жалоба на администратора"):
     user_steam = discord.ui.TextInput(label="Ваш SteamID:", required=True)
@@ -126,7 +124,6 @@ class AdminReportModal(discord.ui.Modal, title="Жалоба на админис
             "Описание": self.description.value
         })
 
-
 class TechModal(discord.ui.Modal, title="Техническая помощь"):
     issue = discord.ui.TextInput(
         label="Опишите проблему",
@@ -138,7 +135,6 @@ class TechModal(discord.ui.Modal, title="Техническая помощь"):
         await create_ticket(interaction, "tech", {
             "Проблема": self.issue.value
         })
-
 
 # ================== HELPERS ==================
 
@@ -405,7 +401,6 @@ async def generate_transcript(channel: discord.TextChannel):
 </html>
 """
 
-
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(html)
 
@@ -437,7 +432,6 @@ async def delete_ticket_channel(channel, guild, user):
     await channel.delete(
         reason=f"Ticket deleted by {user}"
     )
-
 
 # ================== BUTTONS ==================
 class TicketCloseButton(discord.ui.Button):
@@ -504,7 +498,6 @@ class TicketCloseButton(discord.ui.Button):
             )
             return
 
-
 class TicketClaimButton(discord.ui.Button):
     def __init__(self):
         super().__init__(
@@ -567,7 +560,6 @@ class PersistentTicketView(discord.ui.View):
 
         self.add_item(TicketCloseButton())
         self.add_item(TicketClaimButton())
-
 
 # ================== VIEWS ==================
 
@@ -635,7 +627,6 @@ class TicketAdminClosedView(discord.ui.View):
     )
     async def transcript(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
-        await self.lock(interaction)
 
         from config import TRANSCRIPT_PUBLIC_URL
         filename, _ = await generate_transcript(interaction.channel)
@@ -666,7 +657,6 @@ class TicketAdminClosedView(discord.ui.View):
     )
     async def open_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
-        await self.lock(interaction)
 
         ticket = await get_ticket(interaction.channel.id)
         if not ticket:
@@ -861,12 +851,31 @@ class Tickets(commands.Cog):
         embed = discord.Embed(
             title="🎫 Создание тикета",
             description=(
-                "**Выберите подходящую категорию:**\n\n"
-                "🔹 **Заявление о разбане** — если ваш аккаунт был заблокирован.\n"
-                "🔹 **Жалоба на игрока** — если игрок нарушил правила.\n"
-                "🔹 **Жалоба на администратора** — если администратор нарушил правила.\n"
-                "🔹 **Техническая помощь** — проблемы с сервером или игрой.\n\n"
-                "⚠️ Пожалуйста, указывайте точную информацию и прикладывайте доказательства."
+                "Перед созданием тикета **обязательно ознакомьтесь с информацией ниже** 👇\n\n"
+
+                "🔹 **Заявление о разбане**\n"
+                "Выбирайте ТОЛЬКО если ваш аккаунт был заблокирован.\n"
+                "Обязательно укажите **точный SteamID** и **дату наказания**.\n\n"
+
+                "🔹 **Жалоба на игрока**\n"
+                "Используйте, если игрок нарушил правила сервера.\n"
+                "❗ Жалобы **без доказательств** могут быть отклонены.\n\n"
+
+                "🔹 **Жалоба на администратора**\n"
+                "Только при серьёзных нарушениях со стороны администрации.\n"
+                "⚠️ Ложные жалобы влекут наказание.\n\n"
+
+                "🔹 **Техническая помощь**\n"
+                "Проблемы с сервером, вылеты, баги, ошибки подключения.\n\n"
+
+                "⚠️ **ВАЖНО**\n"
+                "• Предоставление ложной информации\n"
+                "• Попытка ввести администрацию в заблуждение\n"
+                "• Флуд и спам тикетами\n\n"
+                "**может привести к наказанию вплоть до блокировки аккаунта.**\n\n"
+
+                "⏳ Рассмотрение тикетов происходит **в порядке очереди**.\n"
+                "❌ Дублирующие тикеты будут закрыты без ответа."
             ),
             color=discord.Color.blurple()
         )
