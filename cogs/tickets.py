@@ -596,6 +596,165 @@ class TicketAdminClosedView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
+    async def disable_all(self, interaction: discord.Interaction):
+        for item in self.children:
+            item.disabled = True
+        await interaction.message.edit(view=self)
+
+    # ================= TRANSCRIPT =================
+
+    @discord.ui.button(
+        label="Transcript",
+        style=discord.ButtonStyle.secondary,
+        custom_id="ticket_transcript"
+    )
+    async def transcript_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.defer(ephemeral=True)
+        await self.disable_all(interaction)
+
+        from config import TRANSCRIPT_PUBLIC_URL
+
+        filename, users = await generate_transcript(interaction.channel)
+        url = f"{TRANSCRIPT_PUBLIC_URL}/transcripts/{filename}"
+
+        ticket = await get_ticket(interaction.channel.id)
+
+        embed = discord.Embed(
+            title="📄 Ticket Transcript",
+            color=discord.Color.blurple()
+        )
+
+        embed.add_field(
+            name="Ticket Owner",
+            value=f"<@{ticket['user_id']}>",
+            inline=True
+        )
+
+        embed.add_field(
+            name="Ticket Name",
+            value=interaction.channel.name,
+            inline=True
+        )
+
+        embed.add_field(
+            name="Panel",
+            value=TICKET_TYPES[ticket["ticket_type"]]["label"],
+            inline=False
+        )
+
+        view = discord.ui.View()
+        view.add_item(
+            discord.ui.Button(
+                label="Open Transcript",
+                style=discord.ButtonStyle.link,
+                url=url
+            )
+        )
+
+        log_channel = interaction.guild.get_channel(
+            int(os.getenv("TICKET_LOG_CHANNEL_ID"))
+        )
+
+        if log_channel:
+            await log_channel.send(embed=embed, view=view)
+
+    # ================= OPEN =================
+
+    @discord.ui.button(
+        label="Open",
+        style=discord.ButtonStyle.success,
+        custom_id="ticket_open"
+    )
+    async def open_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.defer()
+        await self.disable_all(interaction)
+
+        ticket = await get_ticket(interaction.channel.id)
+        if not ticket:
+            return
+
+        guild = interaction.guild
+        user = guild.get_member(ticket["user_id"])
+        admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            user: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        }
+
+        if admin_role:
+            overwrites[admin_role] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                manage_channels=True
+            )
+
+        await interaction.channel.edit(overwrites=overwrites)
+
+        await Database.execute(
+            "UPDATE tickets SET status = 'open' WHERE channel_id = %s",
+            (interaction.channel.id,)
+        )
+
+        await interaction.channel.send(
+            "🔓 **Тикет был повторно открыт администратором.**"
+        )
+
+        await send_ticket_log(
+            guild=guild,
+            title="🔓 Ticket Reopened",
+            description=(
+                f"🎫 **{interaction.channel.name}**\n"
+                f"🛡 Администратор: {interaction.user.mention}"
+            ),
+            color=discord.Color.green()
+        )
+
+    # ================= DELETE =================
+
+    @discord.ui.button(
+        label="Delete",
+        style=discord.ButtonStyle.danger,
+        custom_id="ticket_delete"
+    )
+    async def delete_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.defer()
+        await self.disable_all(interaction)
+
+        await send_ticket_log(
+            guild=interaction.guild,
+            title="🗑 Ticket Deleted",
+            description=(
+                f"🎫 **{interaction.channel.name}**\n"
+                f"🛡 Удалён администратором: {interaction.user.mention}"
+            ),
+            color=discord.Color.dark_red()
+        )
+
+        await Database.execute(
+            "UPDATE tickets SET status = 'deleted' WHERE channel_id = %s",
+            (interaction.channel.id,)
+        )
+
+        await interaction.channel.delete(
+            reason="Ticket deleted by admin"
+        )
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
     @discord.ui.button(
         label="Transcript",
         style=discord.ButtonStyle.secondary,
