@@ -596,7 +596,7 @@ class TicketAdminClosedView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    async def disable_all(self, interaction: discord.Interaction):
+    async def lock(self, interaction: discord.Interaction):
         for item in self.children:
             item.disabled = True
         await interaction.message.edit(view=self)
@@ -607,13 +607,13 @@ class TicketAdminClosedView(discord.ui.View):
         style=discord.ButtonStyle.secondary,
         custom_id="ticket_transcript"
     )
-    async def transcript_button(
+    async def transcript(
         self,
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
         await interaction.response.defer(ephemeral=True)
-        await self.disable_all(interaction)
+        await self.lock(interaction)
 
         from config import TRANSCRIPT_PUBLIC_URL
 
@@ -635,11 +635,11 @@ class TicketAdminClosedView(discord.ui.View):
             )
         )
 
-        log_channel = interaction.guild.get_channel(
+        log = interaction.guild.get_channel(
             int(os.getenv("TICKET_LOG_CHANNEL_ID"))
         )
-        if log_channel:
-            await log_channel.send(embed=embed, view=view)
+        if log:
+            await log.send(embed=embed, view=view)
 
     # 🔓 OPEN
     @discord.ui.button(
@@ -647,13 +647,13 @@ class TicketAdminClosedView(discord.ui.View):
         style=discord.ButtonStyle.success,
         custom_id="ticket_open"
     )
-    async def open_button(
+    async def open_ticket(
         self,
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
         await interaction.response.defer()
-        await self.disable_all(interaction)
+        await self.lock(interaction)
 
         ticket = await get_ticket(interaction.channel.id)
         if not ticket:
@@ -675,13 +675,13 @@ class TicketAdminClosedView(discord.ui.View):
 
         await interaction.channel.edit(overwrites=overwrites)
 
-    # 🗑 DELETE — РАБОЧИЙ
+    # 🗑 DELETE — ФИНАЛЬНЫЙ
     @discord.ui.button(
         label="Delete",
         style=discord.ButtonStyle.danger,
         custom_id="ticket_delete"
     )
-    async def delete_button(
+    async def delete_ticket(
         self,
         interaction: discord.Interaction,
         button: discord.ui.Button
@@ -689,6 +689,7 @@ class TicketAdminClosedView(discord.ui.View):
         import asyncio
 
         await interaction.response.defer()
+        await self.lock(interaction)
 
         channel = interaction.channel
         guild = interaction.guild
