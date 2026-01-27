@@ -631,7 +631,7 @@ class TicketAdminClosedView(discord.ui.View):
     @discord.ui.button(
         label="Transcript",
         style=discord.ButtonStyle.secondary,
-        custom_id="ticket_admin_transcript"   # 🔥 ОБЯЗАТЕЛЬНО
+        custom_id="ticket_admin_transcript"  
     )
     async def transcript(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
@@ -640,6 +640,11 @@ class TicketAdminClosedView(discord.ui.View):
         from config import TRANSCRIPT_PUBLIC_URL
         filename, _ = await generate_transcript(interaction.channel)
         url = f"{TRANSCRIPT_PUBLIC_URL}/transcripts/{filename}"
+
+        await Database.execute(
+        "UPDATE tickets SET transcript_created = 1 WHERE channel_id = %s",
+        (interaction.channel.id,)
+    )
 
         embed = discord.Embed(
             title="📄 Ticket Transcript",
@@ -657,7 +662,7 @@ class TicketAdminClosedView(discord.ui.View):
     @discord.ui.button(
         label="Open",
         style=discord.ButtonStyle.success,
-        custom_id="ticket_admin_open"          # 🔥
+        custom_id="ticket_admin_open"          
     )
     async def open_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
@@ -682,21 +687,58 @@ class TicketAdminClosedView(discord.ui.View):
     @discord.ui.button(
         label="Delete",
         style=discord.ButtonStyle.danger,
-        custom_id="ticket_admin_delete"        # 🔥
+        custom_id="ticket_admin_delete"        
     )
     async def delete_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+
+        ticket = await get_ticket(interaction.channel.id)
+        if not ticket:
+            return
+
+    # ❌ ТРАНСКРИПТА НЕТ
+        if not ticket["transcript_created"]:
+            await interaction.followup.send(
+                "⚠️ **Transcript не был создан!**\n"
+                "Вы уверены, что хотите удалить тикет без сохранения истории?",
+                view=DeleteConfirmView(),
+                ephemeral=True
+            )
+            return
+
+    # ✅ ТРАНСКРИПТ ЕСТЬ — удаляем сразу
+        interaction.client.loop.create_task(
+            delete_ticket_channel(
+                interaction.channel,
+                interaction.guild,
+                interaction.user
+        )
+    )
+
+class DeleteConfirmView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=30)
+
+    @discord.ui.button(
+        label="Confirm Delete",
+        style=discord.ButtonStyle.danger,
+        custom_id="ticket_confirm_delete"
+    )
+    async def confirm(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
         await interaction.response.defer()
-        await self.lock(interaction)
 
         channel = interaction.channel
         guild = interaction.guild
         user = interaction.user
 
-        # 🔥 ВАЖНО: запускаем в фоне
+        # 🔥 удаление запускаем в фоне
         interaction.client.loop.create_task(
             delete_ticket_channel(channel, guild, user)
         )
-
 
 # ================== CREATE TICKET ==================
 
@@ -845,4 +887,3 @@ async def setup(bot):
 
     # 🔥 ОБЯЗАТЕЛЬНО
     bot.add_view(PersistentTicketView())
-    bot.add_view(TicketAdminClosedView())
