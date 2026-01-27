@@ -628,7 +628,11 @@ class TicketAdminClosedView(discord.ui.View):
             item.disabled = True
         await interaction.message.edit(view=self)
 
-    @discord.ui.button(label="Transcript", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(
+        label="Transcript",
+        style=discord.ButtonStyle.secondary,
+        custom_id="ticket_admin_transcript"   # 🔥 ОБЯЗАТЕЛЬНО
+    )
     async def transcript(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         await self.lock(interaction)
@@ -650,7 +654,11 @@ class TicketAdminClosedView(discord.ui.View):
         if log:
             await log.send(embed=embed, view=view)
 
-    @discord.ui.button(label="Open", style=discord.ButtonStyle.success)
+    @discord.ui.button(
+        label="Open",
+        style=discord.ButtonStyle.success,
+        custom_id="ticket_admin_open"          # 🔥
+    )
     async def open_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         await self.lock(interaction)
@@ -671,7 +679,11 @@ class TicketAdminClosedView(discord.ui.View):
 
         await interaction.channel.edit(overwrites=overwrites)
 
-    @discord.ui.button(label="Delete", style=discord.ButtonStyle.danger)
+    @discord.ui.button(
+        label="Delete",
+        style=discord.ButtonStyle.danger,
+        custom_id="ticket_admin_delete"        # 🔥
+    )
     async def delete_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         await self.lock(interaction)
