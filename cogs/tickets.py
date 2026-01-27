@@ -720,43 +720,54 @@ class TicketAdminClosedView(discord.ui.View):
 
     # ================= DELETE =================
 
-    @discord.ui.button(
-        label="Delete",
-        style=discord.ButtonStyle.danger,
-        custom_id="ticket_delete"
+@discord.ui.button(
+    label="Delete",
+    style=discord.ButtonStyle.danger,
+    custom_id="ticket_delete"
+)
+async def delete_button(
+    self,
+    interaction: discord.Interaction,
+    button: discord.ui.Button
+):
+    import asyncio
+
+    channel = interaction.channel
+    guild = interaction.guild
+    user = interaction.user
+
+    # 1️⃣ СРАЗУ отвечаем Discord
+    await interaction.response.defer()
+
+    # 2️⃣ Сообщение в канал
+    warn_msg = await channel.send(
+        "🗑 **Ticket will be deleted in 5 seconds...**"
     )
-    async def delete_button(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-        # 1️⃣ Обязательно сразу отвечаем Discord
-        await interaction.response.defer()
 
-        channel = interaction.channel
-        guild = interaction.guild
+    # 3️⃣ Ждём 5 секунд
+    await asyncio.sleep(5)
 
-        # 2️⃣ ЛОГИ (пока канал ещё существует)
-        await send_ticket_log(
-            guild=guild,
-            title="🗑 Ticket Deleted",
-            description=(
-                f"🎫 **{channel.name}**\n"
-                f"🛡 Удалён администратором: {interaction.user.mention}"
-            ),
-            color=discord.Color.dark_red()
-        )
+    # 4️⃣ ЛОГИ (ПОКА КАНАЛ ЕЩЁ СУЩЕСТВУЕТ)
+    await send_ticket_log(
+        guild=guild,
+        title="🗑 Ticket Deleted",
+        description=(
+            f"🎫 **{channel.name}**\n"
+            f"🛡 Удалён администратором: {user.mention}"
+        ),
+        color=discord.Color.dark_red()
+    )
 
-        # 3️⃣ Обновляем БД (не критично, но правильно)
-        await Database.execute(
-            "UPDATE tickets SET status = 'deleted' WHERE channel_id = %s",
-            (channel.id,)
-        )
+    # 5️⃣ БАЗА (необязательно, но правильно)
+    await Database.execute(
+        "UPDATE tickets SET status = 'deleted' WHERE channel_id = %s",
+        (channel.id,)
+    )
 
-        # 4️⃣ УДАЛЯЕМ КАНАЛ
-        await channel.delete(
-            reason=f"Ticket deleted by {interaction.user}"
-        )
+    # 6️⃣ УДАЛЯЕМ КАНАЛ
+    await channel.delete(
+        reason=f"Ticket deleted by {user}"
+    )
 
 
     def __init__(self):
