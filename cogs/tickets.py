@@ -445,9 +445,10 @@ class TicketCloseButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         ticket = await get_ticket(interaction.channel.id)
         if not ticket:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ Ticket not found.",
-                ephemeral=True
+                ephemeral=True,
+                delete_after=5
             )
             return
 
@@ -547,9 +548,10 @@ class TicketClaimButton(discord.ui.Button):
                 color=discord.Color.blue()
             )
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "✅ Ticket claimed.",
-            ephemeral=True
+            ephemeral=True,
+            delete_after=5
         )
 
 # ================== PERSISTENT VIEW ==================
@@ -821,9 +823,10 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
     view=PersistentTicketView()
     )
 
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"✅ Тикет создан: {channel.mention}",
-        ephemeral=True
+        ephemeral=True,
+        delete_after=5
     )
 
     await send_ticket_log(
@@ -856,7 +859,7 @@ class Tickets(commands.Cog):
         embed_main = discord.Embed(
             title="🎫 Создание тикета",
             description=(
-                "Выберите подходящую категорию для обращения 👇\n\n"
+                "Выберите подходящую категорию для обращения \n\n"
 
                 "🔹 **Заявление о разбане**\n"
                 "Если ваш игровой аккаунт был заблокирован.\n\n"
