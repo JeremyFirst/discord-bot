@@ -730,27 +730,34 @@ class TicketAdminClosedView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
+        # 1️⃣ Обязательно сразу отвечаем Discord
         await interaction.response.defer()
-        await self.disable_all(interaction)
 
+        channel = interaction.channel
+        guild = interaction.guild
+
+        # 2️⃣ ЛОГИ (пока канал ещё существует)
         await send_ticket_log(
-            guild=interaction.guild,
+            guild=guild,
             title="🗑 Ticket Deleted",
             description=(
-                f"🎫 **{interaction.channel.name}**\n"
+                f"🎫 **{channel.name}**\n"
                 f"🛡 Удалён администратором: {interaction.user.mention}"
             ),
             color=discord.Color.dark_red()
         )
 
+        # 3️⃣ Обновляем БД (не критично, но правильно)
         await Database.execute(
             "UPDATE tickets SET status = 'deleted' WHERE channel_id = %s",
-            (interaction.channel.id,)
+            (channel.id,)
         )
 
-        await interaction.channel.delete(
-            reason="Ticket deleted by admin"
+        # 4️⃣ УДАЛЯЕМ КАНАЛ
+        await channel.delete(
+            reason=f"Ticket deleted by {interaction.user}"
         )
+
 
     def __init__(self):
         super().__init__(timeout=None)
