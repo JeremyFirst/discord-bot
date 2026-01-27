@@ -655,13 +655,23 @@ class TicketAdminClosedView(discord.ui.View):
         guild = interaction.guild
         user = interaction.user
 
+        # 🔐 ДАЁМ БОТУ ПРАВА НА КАНАЛ
+        await channel.set_permissions(
+            guild.me,
+            manage_channels=True,
+            view_channel=True
+        )
+
         await channel.send("🗑 **Ticket will be deleted in 5 seconds...**")
         await asyncio.sleep(5)
 
         await send_ticket_log(
             guild=guild,
             title="🗑 Ticket Deleted",
-            description=f"🎫 **{channel.name}**\n🛡 Удалён администратором: {user.mention}",
+            description=(
+                f"🎫 **{channel.name}**\n"
+                f"🛡 Удалён администратором: {user.mention}"
+            ),
             color=discord.Color.dark_red()
         )
 
