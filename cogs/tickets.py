@@ -861,20 +861,16 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
     guild = interaction.guild
     user = interaction.user
 
-    # ============================================================
-    # 🔒 1 ПОЛЬЗОВАТЕЛЬ = 1 ТИКЕТ (ВОТ ЭТОГО БЛОКА У ТЕБЯ НЕ БЫЛО)
-    # ============================================================
+    # ===============================
+    # ПРОВЕРКА: 1 пользователь = 1 тикет
+    # ===============================
     existing_ticket = await Database.fetchrow(
-        """
-        SELECT channel_id FROM tickets
-        WHERE user_id = %s AND status IN ('open', 'closed')
-        """,
+        "SELECT channel_id FROM tickets WHERE user_id = %s AND status = 'open'",
         (user.id,)
     )
 
     if existing_ticket:
         channel = guild.get_channel(existing_ticket["channel_id"])
-
         if channel:
             view = discord.ui.View()
             view.add_item(
@@ -884,33 +880,18 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
                     url=f"https://discord.com/channels/{guild.id}/{channel.id}"
                 )
             )
-
             await interaction.followup.send(
-                "⚠️ **У вас уже есть активный тикет.**\n"
-                "Пожалуйста, используйте уже созданный.",
+                "⚠️ **У вас уже есть активный тикет.**",
                 ephemeral=True,
                 view=view
             )
             return
 
-        # если канал удалён — чистим БД
-        await Database.execute(
-            "DELETE FROM tickets WHERE user_id = %s",
-            (user.id,)
-        )
-
-    # ============================================================
-    # ⬇⬇⬇ НИЖЕ ИДЁТ ТВОЙ СТАРЫЙ КОД БЕЗ ИЗМЕНЕНИЙ
-    # ============================================================
-
+    # ===============================
+    # СОЗДАЁМ КАНАЛ (ВРЕМЕННОЕ ИМЯ)
+    # ===============================
     category = guild.get_channel(TICKET_CATEGORY_ID)
     admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
-
-    row = await Database.fetchrow(
-        "SELECT MAX(ticket_number) AS max_number FROM tickets"
-    )
-    ticket_number = (row["max_number"] or 0) + 1
-
     letter = TICKET_TYPES[ticket_type]["letter"]
 
     overwrites = {
@@ -926,18 +907,20 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
         )
 
     channel = await guild.create_text_channel(
-        name=f"ticket-{ticket_number:04d}{letter}",
+        name="ticket-temp",
         category=category,
         overwrites=overwrites
     )
 
+    # ===============================
+    # ЗАПИСЬ В БД
+    # ===============================
     await Database.execute(
         """
-        INSERT INTO tickets (ticket_number, ticket_type, ticket_letter, user_id, channel_id)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO tickets (ticket_type, ticket_letter, user_id, channel_id, status)
+        VALUES (%s, %s, %s, %s, 'open')
         """,
         (
-            ticket_number,
             ticket_type,
             letter,
             user.id,
@@ -945,6 +928,25 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
         )
     )
 
+    # ===============================
+    # ПОЛУЧАЕМ ID = НОМЕР ТИКЕТА
+    # ===============================
+    row = await Database.fetchrow(
+        "SELECT id FROM tickets WHERE channel_id = %s",
+        (channel.id,)
+    )
+    ticket_number = row["id"]
+
+    # ===============================
+    # ПЕРЕИМЕНОВЫВАЕМ КАНАЛ
+    # ===============================
+    await channel.edit(
+        name=f"ticket-{ticket_number:04d}{letter}"
+    )
+
+    # ===============================
+    # EMBED
+    # ===============================
     embed = discord.Embed(
         title=f"🎫 Тикет #{ticket_number:04d}{letter}",
         description="Информация по обращению:",
@@ -952,49 +954,45 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
     )
 
     embed.set_thumbnail(url=user.display_avatar.url)
-
-    embed.add_field(
-        name="👤 Автор тикета",
-        value=user.mention,
-        inline=False
-    )
-
-    embed.add_field(
-        name="👮 В работе у",
-        value="—",
-        inline=False
-    )
+    embed.add_field(name="👤 Автор тикета", value=user.mention, inline=False)
+    embed.add_field(name="👮 В работе у", value="—", inline=False)
 
     for k, v in fields.items():
-        embed.add_field(
-            name=k,
-            value=v,
-            inline=False
+        embed.add_field(name=k, value=v, inline=False)
+
+    embed.set_footer(text="Пожалуйста, ожидайте ответа администрации")
+
+    await channel.send(embed=embed, view=PersistentTicketView())
+
+    # ===============================
+    # СООБЩЕНИЕ ПОЛЬЗОВАТЕЛЮ
+    # ===============================
+    view = discord.ui.View()
+    view.add_item(
+        discord.ui.Button(
+            label="Перейти к тикету",
+            style=discord.ButtonStyle.link,
+            url=f"https://discord.com/channels/{guild.id}/{channel.id}"
         )
-
-    embed.set_footer(
-        text="Пожалуйста, ожидайте ответа администрации"
-    )
-
-    await channel.send(
-        embed=embed,
-        view=PersistentTicketView()
     )
 
     await interaction.followup.send(
-        f"✅ Тикет создан: {channel.mention}",
+        "✅ **Тикет успешно создан.**",
         ephemeral=True,
-        delete_after=5
+        view=view,
+        delete_after=15
     )
 
+    # ===============================
+    # ЛОГ
+    # ===============================
     await send_ticket_log(
         guild=guild,
         title="🆕 Ticket Created",
         description=(
             f"🎫 **{channel.name}**\n"
             f"👤 Автор: {user.mention}\n"
-            f"📂 Тип: {TICKET_TYPES[ticket_type]['label']}\n"
-            f"📍 Канал: {channel.mention}"
+            f"📂 Тип: {TICKET_TYPES[ticket_type]['label']}"
         ),
         color=discord.Color.green()
     )
