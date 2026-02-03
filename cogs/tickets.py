@@ -203,7 +203,7 @@ async def generate_transcript(channel: discord.TextChannel):
         # 📎 attachments
         for attachment in message.attachments:
             url = attachment.url
-            filename = attachment.filename
+            attachment_name = attachment.filename
 
             if attachment.content_type and attachment.content_type.startswith("image"):
                 content_parts.append(
@@ -220,7 +220,7 @@ async def generate_transcript(channel: discord.TextChannel):
             else:
                 content_parts.append(
                     f"<div class='attachment'>"
-                    f"<a href='{url}' target='_blank'>📎 {filename}</a>"
+                    f"<a href='{url}' target='_blank'>📎 {attachment_name}</a>"
                     f"</div>"
                 )
 
@@ -886,14 +886,14 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
             )
 
             await interaction.followup.send(
-            "⚠️ **У вас уже есть активный тикет.**\n"
-            "Пожалуйста, используйте уже созданный.",
-            ephemeral=True,
-            delete_after=5
-        )
+                "⚠️ **У вас уже есть активный тикет.**\n"
+                "Пожалуйста, используйте уже созданный.",
+                ephemeral=True,
+                view=view
+            )
             return
 
-        # если канал удалён, а запись осталась — чистим БД
+        # если канал удалён — чистим БД
         await Database.execute(
             "DELETE FROM tickets WHERE user_id = %s",
             (user.id,)
