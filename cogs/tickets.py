@@ -200,7 +200,31 @@ async def generate_transcript(channel: discord.TextChannel):
             )
             content_parts.append(f"<div>{safe_content}</div>")
 
-        # embeds (ОЧЕНЬ ВАЖНО)
+        # 📎 attachments
+        for attachment in message.attachments:
+            url = attachment.url
+            filename = attachment.filename
+
+            if attachment.content_type and attachment.content_type.startswith("image"):
+                content_parts.append(
+                    f"<div class='attachment'>"
+                    f"<img src='{url}' style='max-width:400px;border-radius:8px;'>"
+                    f"</div>"
+                )
+            elif attachment.content_type and attachment.content_type.startswith("video"):
+                content_parts.append(
+                    f"<div class='attachment'>"
+                    f"<video src='{url}' controls style='max-width:400px;'></video>"
+                    f"</div>"
+                )
+            else:
+                content_parts.append(
+                    f"<div class='attachment'>"
+                    f"<a href='{url}' target='_blank'>📎 {filename}</a>"
+                    f"</div>"
+                )
+
+        # embeds
         for embed in message.embeds:
             embed_block = ""
 
@@ -217,18 +241,22 @@ async def generate_transcript(channel: discord.TextChannel):
                 embed_block += f"<div class='embed-desc'>{desc}</div>"
 
             for field in embed.fields:
+                safe_value = (
+                    field.value
+                    .replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                )
+
                 embed_block += (
                     f"<div class='embed-field'>"
-                    f"<b>{field.name}</b><br>{field.value}"
+                    f"<b>{field.name}</b><br>{safe_value}"
                     f"</div>"
                 )
 
             if embed_block:
-                content_parts.append(
-                    f"<div class='embed'>{embed_block}</div>"
-                )
+                content_parts.append(f"<div class='embed'>{embed_block}</div>")
 
-        # если вообще ничего нет
         if not content_parts:
             content_parts.append("<i>(empty message)</i>")
 
@@ -352,6 +380,10 @@ async def generate_transcript(channel: discord.TextChannel):
             line-height: 1.4;
         }}
 
+        .attachment {{
+            margin-top: 6px;
+        }}
+
         .embed {{
             background: #020617;
             border-left: 4px solid #5865f2;
@@ -359,7 +391,6 @@ async def generate_transcript(channel: discord.TextChannel):
             border-radius: 6px;
             margin-top: 6px;
         }}
-
         .embed-title {{
             font-weight: 600;
             margin-bottom: 4px;
@@ -434,11 +465,18 @@ async def send_quick_reply(interaction: discord.Interaction, text: str):
         avatar_url=user.display_avatar.url
     )
 
-    await interaction.response.send_message(
-        "✅ Сообщение отправлено.",
-        ephemeral=True,
-        delete_after=5
-    )
+    if interaction.response.is_done():
+        await interaction.followup.send(
+            "✅ Сообщение отправлено.",
+            ephemeral=True,
+            delete_after=5
+        )
+    else:
+        await interaction.response.send_message(
+            "✅ Сообщение отправлено.",
+            ephemeral=True,
+            delete_after=5
+        )
 
 # ================== DELETE TASK ==================
 
@@ -847,13 +885,12 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
                 )
             )
 
-            await interaction.response.send_message(
-                "⚠️ **У вас уже есть активный тикет.**\n"
-                "Пожалуйста, используйте его.",
-                ephemeral=True,
-                view=view,
-                delete_after=5
-            )
+            await interaction.followup.send(
+            "⚠️ **У вас уже есть активный тикет.**\n"
+            "Пожалуйста, используйте уже созданный.",
+            ephemeral=True,
+            delete_after=5
+        )
             return
 
         # если канал удалён, а запись осталась — чистим БД
