@@ -77,6 +77,7 @@ class UnbanModal(discord.ui.Modal, title="Заявление о разбане")
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         await create_ticket(interaction, "unban_request", {
             "SteamID": self.steam.value,
             "Дата наказания": self.ban_time.value,
@@ -94,6 +95,7 @@ class PlayerReportModal(discord.ui.Modal, title="Жалоба на игрока"
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         await create_ticket(interaction, "player_report", {
             "Нарушитель": self.violator.value,
             "Время": self.time.value,
@@ -113,6 +115,7 @@ class AdminReportModal(discord.ui.Modal, title="Жалоба на админис
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         await create_ticket(interaction, "admin_report", {
             "Ваш SteamID": self.user_steam.value,
             "Администратор": self.admin.value,
@@ -129,6 +132,7 @@ class TechModal(discord.ui.Modal, title="Техническая помощь"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         await create_ticket(interaction, "tech", {
             "Проблема": self.issue.value
         })
@@ -528,7 +532,7 @@ class TicketCloseButton(discord.ui.Button):
                 view=TicketAdminClosedView()
             )
             return
-
+            
 class TicketClaimButton(discord.ui.Button):
     def __init__(self):
         super().__init__(
