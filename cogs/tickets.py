@@ -911,7 +911,6 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
         category=category,
         overwrites=overwrites
     )
-
     # ===============================
     # ЗАПИСЬ В БД
     # ===============================
@@ -927,7 +926,6 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
             channel.id
         )
     )
-
     # ===============================
     # ПОЛУЧАЕМ ID = НОМЕР ТИКЕТА
     # ===============================
@@ -936,14 +934,12 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
         (channel.id,)
     )
     ticket_number = row["id"]
-
     # ===============================
     # ПЕРЕИМЕНОВЫВАЕМ КАНАЛ
     # ===============================
     await channel.edit(
         name=f"ticket-{ticket_number:04d}{letter}"
     )
-
     # ===============================
     # EMBED
     # ===============================
@@ -952,7 +948,6 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
         description="Информация по обращению:",
         color=discord.Color.blurple()
     )
-
     embed.set_thumbnail(url=user.display_avatar.url)
     embed.add_field(name="👤 Автор тикета", value=user.mention, inline=False)
     embed.add_field(name="👮 В работе у", value="—", inline=False)
