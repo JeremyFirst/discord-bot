@@ -581,19 +581,20 @@ class TicketClaimButton(discord.ui.Button):
             )
 
         # 🛠 ПАНЕЛЬ АДМИНИСТРАТОРА (БЫСТРЫЕ ОТВЕТЫ)
-        embed = discord.Embed(
+        admin_embed = discord.Embed(
             title="🛠 Панель администратора",
             description=(
                 "Быстрые ответы для общения с пользователем.\n\n"
-                "⚠️ Сообщения отправляются от имени администратора "
-                "через систему поддержки."
+                "📣 Сообщения отправляются **через систему поддержки** "
+                "и видны пользователю."
             ),
             color=discord.Color.dark_gray()
         )
 
-        await interaction.channel.send(
-            embed=embed,
-            view=AdminQuickRepliesView()
+        await interaction.followup.send(
+            embed=admin_embed,
+            view=AdminQuickRepliesView(),
+            ephemeral=True
         )
 
         await interaction.followup.send(
