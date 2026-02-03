@@ -1038,4 +1038,3 @@ async def setup(bot):
     await bot.add_cog(Tickets(bot))
 
     bot.add_view(PersistentTicketView())
-    bot.add_view(AdminQuickRepliesView())
