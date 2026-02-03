@@ -538,6 +538,8 @@ class TicketClaimButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+
         guild = interaction.guild
         admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
 
@@ -578,12 +580,6 @@ class TicketClaimButton(discord.ui.Button):
                 color=discord.Color.blue()
             )
 
-        await interaction.followup.send(
-            "✅ Ticket claimed.",
-            ephemeral=True,
-            delete_after=5
-        )
-
         # 🛠 ПАНЕЛЬ АДМИНИСТРАТОРА (БЫСТРЫЕ ОТВЕТЫ)
         embed = discord.Embed(
             title="🛠 Панель администратора",
@@ -600,6 +596,11 @@ class TicketClaimButton(discord.ui.Button):
             view=AdminQuickRepliesView()
         )
 
+        await interaction.followup.send(
+            "✅ Ticket claimed.",
+            ephemeral=True,
+            delete_after=5
+        )
 
 # ================== PERSISTENT VIEW ==================
 
