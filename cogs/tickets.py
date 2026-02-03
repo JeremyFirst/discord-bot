@@ -167,7 +167,6 @@ async def send_ticket_log(
 import os
 from datetime import timezone
 
-
 async def generate_transcript(channel: discord.TextChannel):
     os.makedirs("transcripts", exist_ok=True)
 
@@ -403,6 +402,40 @@ async def generate_transcript(channel: discord.TextChannel):
 
     return filename, users
 
+
+async def send_quick_reply(interaction: discord.Interaction, text: str):
+    channel = interaction.channel
+    user = interaction.user
+
+    # 🔐 проверка на админа
+    admin_role = interaction.guild.get_role(TICKET_ADMIN_ROLE_ID)
+    if not admin_role or admin_role not in user.roles:
+        await interaction.response.send_message(
+            "❌ Только для администрации.",
+            ephemeral=True,
+            delete_after=5
+        )
+        return
+
+    # 🔗 webhook
+    webhooks = await channel.webhooks()
+    webhook = discord.utils.get(webhooks, name="TicketSupport")
+
+    if not webhook:
+        webhook = await channel.create_webhook(name="TicketSupport")
+
+    await webhook.send(
+        content=text,
+        username=f"{user.display_name} (Support)",
+        avatar_url=user.display_avatar.url
+    )
+
+    await interaction.response.send_message(
+        "✅ Сообщение отправлено.",
+        ephemeral=True,
+        delete_after=5
+    )
+
 # ================== DELETE TASK ==================
 
 async def delete_ticket_channel(channel, guild, user):
@@ -550,6 +583,23 @@ class TicketClaimButton(discord.ui.Button):
             ephemeral=True,
             delete_after=5
         )
+
+        # 🛠 ПАНЕЛЬ АДМИНИСТРАТОРА (БЫСТРЫЕ ОТВЕТЫ)
+        embed = discord.Embed(
+            title="🛠 Панель администратора",
+            description=(
+                "Быстрые ответы для общения с пользователем.\n\n"
+                "⚠️ Сообщения отправляются от имени администратора "
+                "через систему поддержки."
+            ),
+            color=discord.Color.dark_gray()
+        )
+
+        await interaction.channel.send(
+            embed=embed,
+            view=AdminQuickRepliesView()
+        )
+
 
 # ================== PERSISTENT VIEW ==================
 
@@ -727,6 +777,38 @@ class DeleteConfirmView(discord.ui.View):
         # 🔥 удаление запускаем в фоне
         interaction.client.loop.create_task(
             delete_ticket_channel(channel, guild, user)
+        )
+
+class AdminQuickRepliesView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="🟢 Принято", style=discord.ButtonStyle.success)
+    async def accepted(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await send_quick_reply(
+            interaction,
+            "👋 Здравствуйте! Ваш тикет принят, ожидайте ответа администрации."
+        )
+
+    @discord.ui.button(label="🟡 Нужны доказательства", style=discord.ButtonStyle.secondary)
+    async def proof(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await send_quick_reply(
+            interaction,
+            "❗ Пожалуйста, предоставьте доказательства (скриншоты / видео)."
+        )
+
+    @discord.ui.button(label="🔵 В ожидании", style=discord.ButtonStyle.primary)
+    async def waiting(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await send_quick_reply(
+            interaction,
+            "⏳ Ваш тикет находится в обработке. Пожалуйста, ожидайте."
+        )
+
+    @discord.ui.button(label="🔴 Отказ", style=discord.ButtonStyle.danger)
+    async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await send_quick_reply(
+            interaction,
+            "🚫 В обращении отказано. Причина: нарушение правил проекта."
         )
 
 # ================== CREATE TICKET ==================
@@ -956,3 +1038,4 @@ async def setup(bot):
     await bot.add_cog(Tickets(bot))
 
     bot.add_view(PersistentTicketView())
+    bot.add_view(AdminQuickRepliesView())
