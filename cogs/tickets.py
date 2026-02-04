@@ -518,7 +518,7 @@ class TicketCloseButton(discord.ui.Button):
         ticket = await get_ticket(interaction.channel.id)
         if not ticket:
             await interaction.followup.send(
-                "❌ Ticket not found.",
+                "❌Ticket not found.",
                 ephemeral=True,
                 delete_after=5
             )
@@ -530,22 +530,26 @@ class TicketCloseButton(discord.ui.Button):
         is_admin = admin_role in interaction.user.roles if admin_role else False
         is_owner = interaction.user.id == ticket["user_id"]
 
-        # 👤 USER
+        # USER
         if is_owner and not is_admin:
             await interaction.response.send_message(
-                "❗ Вы уверены, что хотите закрыть тикет?\n"
+                "Вы уверены, что хотите закрыть тикет?\n"
                 "Are you sure you want to close this ticket?",
                 view=CloseConfirmView(),
                 ephemeral=True
             )
             return
 
-        # 🛡 ADMIN
+        # ADMIN
         if is_admin:
             await interaction.response.defer()
 
             await Database.execute(
-                "UPDATE tickets SET status = 'closed' WHERE channel_id = %s",
+                """
+                UPDATE tickets
+                SET status = 'closed', assigned_admin_id = NULL
+                WHERE channel_id = %s
+                """,
                 (interaction.channel.id,)
             )
 
@@ -585,16 +589,56 @@ class TicketClaimButton(discord.ui.Button):
         guild = interaction.guild
         admin_role = guild.get_role(TICKET_ADMIN_ROLE_ID)
 
+        #проверка на админа
         if not admin_role or admin_role not in interaction.user.roles:
-            await interaction.response.send_message(
-                "❌ You are not allowed to claim this ticket.",
-                ephemeral=True
+            await interaction.followup.send(
+                "❌ Только администрация может брать тикеты.",
+                ephemeral=True,
+                delete_after=5
             )
             return
 
+        # =================================================
+        # CLAIM-LOCK: админ может вести ТОЛЬКО 1 тикет
+        # =================================================
+        existing_claim = await Database.fetchrow(
+            """
+            SELECT channel_id FROM tickets
+            WHERE assigned_admin_id = %s AND status = 'open'
+            """,
+            (interaction.user.id,)
+        )
+
+        if existing_claim:
+            channel = guild.get_channel(existing_claim["channel_id"])
+            text = "❌ **Вы уже ведёте другой тикет.**"
+            if channel:
+                text += f"\nПерейдите в {channel.mention}"
+
+            await interaction.followup.send(
+                text,
+                ephemeral=True,
+                delete_after=7
+            )
+            return
+
+        # =================================================
+        # сохраняем админа как ответственного
+        # =================================================
+        await Database.execute(
+            """
+            UPDATE tickets
+            SET assigned_admin_id = %s
+            WHERE channel_id = %s
+            """,
+            (interaction.user.id, interaction.channel.id)
+        )
+
+        # =================================================
+        # обновляем embed (поле "В работе у")
+        # =================================================
         embed = interaction.message.embeds[0]
 
-        # Обновляем поле "В работе у"
         for index, field in enumerate(embed.fields):
             if field.name == "👮 В работе у":
                 embed.set_field_at(
@@ -605,30 +649,19 @@ class TicketClaimButton(discord.ui.Button):
                 )
                 break
 
-
         await interaction.message.edit(
             embed=embed,
             view=TicketUserView(is_admin=False)
         )
 
-        await send_ticket_log(
-                guild=interaction.guild,
-                title="🟢 Ticket Claimed",
-                description=(
-                    f"🎫 **{interaction.channel.name}**\n"
-                    f"👮 В работе у: {interaction.user.mention}\n"
-                    f"📍 Канал: {interaction.channel.mention}"
-                ),
-                color=discord.Color.blue()
-            )
-
-        # 🛠 ПАНЕЛЬ АДМИНИСТРАТОРА (БЫСТРЫЕ ОТВЕТЫ)
+        # =================================================
+        # Панель администратора (ephemeral)
+        # =================================================
         admin_embed = discord.Embed(
             title="🛠 Панель администратора",
             description=(
                 "Быстрые ответы для общения с пользователем.\n\n"
-                "📣 Сообщения отправляются **через систему поддержки** "
-                "и видны пользователю."
+                "📣 Сообщения отправляются через систему поддержки."
             ),
             color=discord.Color.dark_gray()
         )
@@ -640,7 +673,7 @@ class TicketClaimButton(discord.ui.Button):
         )
 
         await interaction.followup.send(
-            "✅ Ticket claimed.",
+            "✅ Тикет взят в работу.",
             ephemeral=True,
             delete_after=5
         )
