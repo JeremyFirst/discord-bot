@@ -1,6 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+from utils.validators import clean_text, validate_steamid
 
 from config import TICKET_CATEGORY_ID, TICKET_ADMIN_ROLE_ID
 from core.database import Database
@@ -77,11 +78,22 @@ class UnbanModal(discord.ui.Modal, title="Заявление о разбане")
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        try:
+            steam = validate_steamid(self.steam.value)
+            ban_time = clean_text(self.ban_time.value, 100)
+            description = clean_text(self.description.value, 1500)
+        except ValueError as e:
+            await interaction.response.send_message(
+                f"❌ {e}",
+                ephemeral=True
+            )
+            return
+
         await interaction.response.defer(ephemeral=True)
         await create_ticket(interaction, "unban_request", {
-            "SteamID": self.steam.value,
-            "Дата наказания": self.ban_time.value,
-            "Описание": self.description.value
+            "SteamID": steam,
+            "Дата наказания": ban_time,
+            "Описание": description
         })
 
 class PlayerReportModal(discord.ui.Modal, title="Жалоба на игрока"):
@@ -96,12 +108,16 @@ class PlayerReportModal(discord.ui.Modal, title="Жалоба на игрока"
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
+
+        from utils.validators import clean_text
+
         await create_ticket(interaction, "player_report", {
-            "Нарушитель": self.violator.value,
-            "Время": self.time.value,
-            "Доказательства": self.proofs.value or "Не предоставлены",
-            "Описание": self.description.value
+            "Нарушитель": clean_text(self.violator.value, 64),
+            "Время": clean_text(self.time.value, 64),
+            "Доказательства": clean_text(self.proofs.value or "Не предоставлены", 256),
+            "Описание": clean_text(self.description.value, 1500)
         })
+
 
 class AdminReportModal(discord.ui.Modal, title="Жалоба на администратора"):
     user_steam = discord.ui.TextInput(label="Ваш SteamID:", required=True)
@@ -945,28 +961,18 @@ async def create_ticket(interaction: discord.Interaction, ticket_type: str, fiel
         overwrites=overwrites
     )
     # ===============================
-    # ЗАПИСЬ В БД
+    # ПОЛУЧАЕМ ID = НОМЕР ТИКЕТА
     # ===============================
-    await Database.execute(
+    ticket_id = await Database.execute(
         """
         INSERT INTO tickets (ticket_type, ticket_letter, user_id, channel_id, status)
         VALUES (%s, %s, %s, %s, 'open')
         """,
-        (
-            ticket_type,
-            letter,
-            user.id,
-            channel.id
-        )
+        (ticket_type, letter, user.id, channel.id),
+        return_lastrowid=True
     )
-    # ===============================
-    # ПОЛУЧАЕМ ID = НОМЕР ТИКЕТА
-    # ===============================
-    row = await Database.fetchrow(
-        "SELECT id FROM tickets WHERE channel_id = %s",
-        (channel.id,)
-    )
-    ticket_number = row["id"]
+
+    ticket_number = ticket_id
     # ===============================
     # ПЕРЕИМЕНОВЫВАЕМ КАНАЛ
     # ===============================
